@@ -21,6 +21,12 @@ interface State {
   removeLabel: (labelId: number) => void;
   setFrame: (frame: number) => void;
   setSaveStatus: (s: State['saveStatus']) => void;
+  conflicts: Record<string, { message: string; current: any }>;
+  saveErrors: Record<string, any>;
+  setConflict: (id: string, detail: any) => void;
+  clearConflict: (id: string) => void;
+  setSaveError: (id: string, err: any) => void;
+  clearSaveError: (id: string) => void;
 
   // Tools & selection
   setTool: (t: ToolType) => void;
@@ -58,6 +64,8 @@ export const useAnnotationStore = create<State>((set, get) => ({
   primaryId: null,
   currentTool: 'select',
   saveStatus: 'idle',
+  conflicts: {},
+  saveErrors: {},
 
   setTask: (taskId) => set({ taskId, annotations: [], selectedIds: [], primaryId: null, frame: 0 }),
 
@@ -124,6 +132,23 @@ export const useAnnotationStore = create<State>((set, get) => ({
   setAnnotations: (anns) => set({ annotations: anns }),
 
   addLocal: (a) => set((s) => ({ annotations: [...s.annotations, a] })),
+
+  setConflict: (id, detail) =>
+    set((s) => ({ conflicts: { ...s.conflicts, [id]: detail } })),
+  clearConflict: (id) =>
+    set((s) => {
+      const next = { ...s.conflicts };
+      delete next[id];
+      return { conflicts: next };
+    }),
+  setSaveError: (id, err) =>
+    set((s) => ({ saveErrors: { ...s.saveErrors, [id]: err } })),
+  clearSaveError: (id) =>
+    set((s) => {
+      const next = { ...s.saveErrors };
+      delete next[id];
+      return { saveErrors: next };
+    }),
 
   // ---------- Lifecycle (adjust existing ones) ----------
   // attachServerId must rewrite both selections

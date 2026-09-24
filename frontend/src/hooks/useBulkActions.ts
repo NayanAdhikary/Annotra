@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
-import { useAnnotationStore } from '../store/annotationStore';
 import { annotationsApi } from '../api/annotations';
+import { useAnnotationStore } from '../store/annotationStore';
 import { useSaveStatus } from './useSaveStatus';
+import { useHistoryStore } from '../store/historyStore';
+import { ChangeLabelCommand, ToggleOccludedCommand } from '../commands/AnnotationCommands';
 
 /**
  * Keyboard-driven bulk actions:
@@ -34,7 +36,16 @@ export function useBulkActions(taskId: number | null) {
         const label = labels[idx];
         if (!label) return;
 
-        store.replaceMany(selectedIds, { labelId: label.id });
+        const fromLabelId = selected[0].labelId;
+        if (selected.some((a) => a.labelId !== fromLabelId)) {
+          // Mixed labels — use each selected's own from-value
+          for (const a of selected) {
+            useHistoryStore.getState().execute(new ChangeLabelCommand([a.id], a.labelId, label.id));
+          }
+        } else {
+          useHistoryStore.getState().execute(new ChangeLabelCommand(selectedIds, fromLabelId, label.id));
+        }
+
         if (serverIds.length) {
           wrap(() =>
             annotationsApi.bulkPatch(taskId, {
@@ -43,6 +54,7 @@ export function useBulkActions(taskId: number | null) {
             }),
           ).catch(() => {
             // Day 10: roll back from command stack
+            useHistoryStore.getState().undo();
           });
         }
         return;
@@ -52,14 +64,18 @@ export function useBulkActions(taskId: number | null) {
       if (e.key.toLowerCase() === 'o') {
         const allOccluded = selected.every((a) => a.occluded);
         const nextValue = !allOccluded;
-        store.replaceMany(selectedIds, { occluded: nextValue });
+        
+        useHistoryStore.getState().execute(new ToggleOccludedCommand(selectedIds, nextValue));
+
         if (serverIds.length) {
           wrap(() =>
             annotationsApi.bulkPatch(taskId, {
               ids: serverIds,
               patch: { occluded: nextValue },
             }),
-          ).catch(() => {});
+          ).catch(() => {
+             useHistoryStore.getState().undo();
+          });
         }
       }
     };

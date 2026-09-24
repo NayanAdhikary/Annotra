@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from typing import List
@@ -100,9 +100,30 @@ async def bulk_create(task_id: int, payload: BulkAnnotationCreate,
 
 @router.patch("/annotations/{ann_id}", response_model=AnnotationResponse)
 async def update_annotation(ann_id: int, payload: AnnotationUpdate,
+                            request: Request,
                             db: AsyncSession = Depends(get_db),
                             user: User = Depends(get_current_user)):
     ann = await _assert_can_edit(db, ann_id, user)
+
+    # --- Optimistic concurrency check ---
+    # Client sends `If-Match: <updated_at-iso>` if it has a known version.
+    # If it doesn't match, another user changed the annotation since we saw it.
+    if_match = request.headers.get("if-match")
+    if if_match:
+        current_iso = ann.updated_at.isoformat() if ann.updated_at else ""
+        if if_match != current_iso:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail={
+                    "message": "Annotation was modified by another user",
+                    "current": {
+                        "id": ann.id,
+                        "points": ann.points,
+                        "label_id": ann.label_id,
+                        "updated_at": current_iso,
+                    },
+                },
+            )
 
     data = payload.model_dump(exclude_unset=True)
 

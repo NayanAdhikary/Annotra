@@ -14,8 +14,9 @@ export const annotationsApi = {
     const { data } = await api.post(`/api/tasks/${taskId}/annotations`, payload);
     return data;
   },
-  update: async (annId: number, patch: Partial<CreateAnnotationPayload>) => {
-    const { data } = await api.patch(`/api/annotations/${annId}`, patch);
+  update: async (annId: number, patch: Partial<CreateAnnotationPayload>, ifMatch?: string) => {
+    const config = ifMatch ? { headers: { 'If-Match': ifMatch } } : {};
+    const { data } = await api.patch(`/api/annotations/${annId}`, patch, config);
     return data;
   },
   remove: async (annId: number) => {

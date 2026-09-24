@@ -3,6 +3,8 @@ import { useAnnotationStore } from '../../store/annotationStore';
 import { annotationsApi } from '../../api/annotations';
 import { useSaveStatus } from '../../hooks/useSaveStatus';
 import type { Annotation } from '../../types/annotation';
+import { useHistoryStore } from '../../store/historyStore';
+import { DeleteAnnotationCommand, DeleteManyCommand } from '../../commands/AnnotationCommands';
 
 const ICON: Record<Annotation['shapeType'], string> = {
   rectangle: '▭',
@@ -13,9 +15,10 @@ const ICON: Record<Annotation['shapeType'], string> = {
 
 export const AnnotationList: React.FC = () => {
   const {
-    annotations, frame, labels, primaryId, selectedIds, selectOne, removeLocal, removeMany, taskId
+    annotations, frame, labels, primaryId, selectedIds, selectOne, taskId
   } = useAnnotationStore();
   const wrap = useSaveStatus();
+  const execute = useHistoryStore((s) => s.execute);
 
   const visible = annotations.filter((a) => a.frame === frame);
 
@@ -34,12 +37,18 @@ export const AnnotationList: React.FC = () => {
     if (!targets.length) return;
     const serverIds = targets.map((a) => a.serverId).filter((x): x is number => !!x);
 
-    removeMany(targets.map((t) => t.id));
+    execute(
+      targets.length === 1
+        ? new DeleteAnnotationCommand(targets[0])
+        : new DeleteManyCommand(targets),
+    );
+
     if (serverIds.length) {
       try {
         await wrap(() => annotationsApi.bulkDelete(taskId!, serverIds));
       } catch {
-        alert('Bulk delete failed');
+        // Day 12b: surface a toast. For now, pop the command.
+        useHistoryStore.getState().undo();
       }
     }
   };

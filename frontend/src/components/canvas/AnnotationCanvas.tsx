@@ -18,6 +18,8 @@ import { ZoomControls } from '../Viewport/ZoomControls';
 import { annotationsApi } from '../../api/annotations';
 import { useSaveStatus } from '../../hooks/useSaveStatus';
 import type { Annotation } from '../../types/annotation';
+import { useHistoryStore } from '../../store/historyStore';
+import { AddAnnotationCommand } from '../../commands/AnnotationCommands';
 
 interface Props {
   taskId: number;
@@ -34,7 +36,7 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
 
   const {
     annotations, labels, selectedIds, currentTool, activeLabelId, frame,
-    addLocal, attachServerId, removeLocal, selectOne, toggleSelect, setTool,
+    attachServerId, selectOne, toggleSelect, setTool,
   } = useAnnotationStore();
 
   const live = useViewportStore((s) => s.live);
@@ -89,6 +91,8 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
     return pos ? [pos.x, pos.y] : [0, 0];
   }, []);
 
+  const execute = useHistoryStore((s) => s.execute);
+
   const commitShape = useCallback(
     async (shapeType: Annotation['shapeType'], points: number[]) => {
       if (!activeLabelId) return;
@@ -98,8 +102,10 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
         labelId: activeLabelId, shapeType, points,
         occluded: false, source: 'manual', groupId: 0,
       };
-      addLocal(draft);
-      selectOne(localId);
+
+      // Instead of addLocal + selectOne directly:
+      execute(new AddAnnotationCommand(draft));
+
       try {
         const server = await wrap(() =>
           annotationsApi.create(taskId, {
@@ -111,10 +117,12 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
         attachServerId(localId, server.id);
       } catch (e) {
         console.error('persist failed', e);
-        removeLocal(localId);
+        // Rollback via history store (and pop future so it can't be redone)
+        useHistoryStore.getState().undo();
+        useHistoryStore.setState({ future: [] });
       }
     },
-    [taskId, frame, activeLabelId, addLocal, attachServerId, removeLocal, selectOne, wrap],
+    [taskId, frame, activeLabelId, execute, attachServerId, wrap],
   );
 
   const onMouseDown = useCallback((e: any) => {

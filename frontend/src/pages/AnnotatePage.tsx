@@ -1,20 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Toolbar } from '../components/Toolbar/Toolbar';
+import { HistoryControls } from '../components/Toolbar/HistoryControls';
 import { AnnotationCanvas } from '../components/Canvas/AnnotationCanvas';
 import { AnnotationList } from '../components/Sidebar/AnnotationList';
 import { SaveIndicator } from '../components/Status/SaveIndicator';
+import { ConflictBanner } from '../components/Status/ConflictBanner';
 import { LabelManager } from '../components/LabelManager/LabelManager';
 import { useAnnotationStore } from '../store/annotationStore';
 import { labelsApi } from '../api/labels';
 import { imagesApi, type ImageAsset } from '../api/images';
 import { annotationsApi } from '../api/annotations';
 import { taskApi, type Task } from '../api/project';
-import { useDebouncedPersist } from '../hooks/useDebouncedPersist';
+import { useAutosaveQueue } from '../hooks/useAutosaveQueue';
+import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import { useBulkActions } from '../hooks/useBulkActions';
 import { RectInspector } from '../components/Inspector/RectInspector';
 import { UserMenu } from '../components/Layout/UserMenu';
 import type { Annotation } from '../types/annotation';
+import { useHistoryKeys } from '../hooks/useHistoryKeys';
+import { useHistoryStore } from '../store/historyStore';
 
 export const AnnotatePage: React.FC = () => {
   const { taskId } = useParams<{ taskId: string }>();
@@ -28,8 +33,14 @@ export const AnnotatePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showLabelManager, setShowLabelManager] = useState(false);
 
-  useDebouncedPersist();
+  const saveStatus = useAnnotationStore((s) => s.saveStatus);
+  
+  useUnsavedGuard(saveStatus === 'saving');
+  useAutosaveQueue();
   useBulkActions(id);
+  useHistoryKeys();
+
+  useEffect(() => { useHistoryStore.getState().clear(); }, [id]);
 
   useEffect(() => {
     if (storeTaskId === id) return;
@@ -156,11 +167,14 @@ export const AnnotatePage: React.FC = () => {
         </div>
         <Toolbar onManageLabels={() => setShowLabelManager(true)} />
         <div className="flex items-center gap-5">
+          <HistoryControls />
           <SaveIndicator />
           <div className="h-6 w-px bg-slate-200"></div>
           <UserMenu />
         </div>
       </header>
+
+      <ConflictBanner />
 
       {/* Shortcuts bar */}
       <div className="px-4 py-1.5 text-[11px] text-slate-500 border-b border-slate-200 bg-slate-50 flex flex-wrap gap-x-6 gap-y-1 font-medium shrink-0">

@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Circle, Group } from 'react-konva';
 import { useAnnotationStore } from '../../store/annotationStore';
 import type { Annotation } from '../../types/annotation';
+import { useHistoryStore } from '../../store/historyStore';
+import { ReplacePointsCommand } from '../../commands/AnnotationCommands';
 
 const COLOR = '#00E5FF';
 const MID_COLOR = '#FFC400';
@@ -22,6 +24,9 @@ export const VertexHandles: React.FC<Props> = ({ annotation, scale }) => {
   const MIDPOINT_R = 3.5 / scale;
   const STROKE_W = 1 / scale;
   const replaceAnnotation = useAnnotationStore((s) => s.replaceAnnotation);
+  const execute = useHistoryStore((s) => s.execute);
+  const dragStartRef = useRef<number[] | null>(null);
+  
   const pts = annotation.points;
   const n = pts.length / 2;
   const isClosed = annotation.shapeType === 'polygon';
@@ -38,7 +43,7 @@ export const VertexHandles: React.FC<Props> = ({ annotation, scale }) => {
     if (n <= minVerts) return;
     const next = [...pts];
     next.splice(i * 2, 2);
-    replaceAnnotation(annotation.id, { points: next });
+    execute(new ReplacePointsCommand([{ id: annotation.id, from: pts, to: next }]));
   };
 
   const insertVertexAt = (edgeIndex: number) => {
@@ -49,7 +54,7 @@ export const VertexHandles: React.FC<Props> = ({ annotation, scale }) => {
     const mid = [(ax + bx) / 2, (ay + by) / 2];
     const next = [...pts];
     next.splice((edgeIndex + 1) * 2, 0, mid[0], mid[1]);
-    replaceAnnotation(annotation.id, { points: next });
+    execute(new ReplacePointsCommand([{ id: annotation.id, from: pts, to: next }]));
   };
 
   return (
@@ -98,12 +103,17 @@ export const VertexHandles: React.FC<Props> = ({ annotation, scale }) => {
                 deleteVertex(i);
               }
             }}
+            onDragStart={() => { dragStartRef.current = [...annotation.points]; }}
             onDragMove={(e) => {
               setVertex(i, e.target.x(), e.target.y());
             }}
             onDragEnd={(e) => {
-              // Already persisted via onDragMove; ensure final position is exact
-              setVertex(i, e.target.x(), e.target.y());
+              const next = [...annotation.points];
+              next[i * 2] = e.target.x();
+              next[i * 2 + 1] = e.target.y();
+              execute(new ReplacePointsCommand([
+                { id: annotation.id, from: dragStartRef.current!, to: next },
+              ]));
             }}
             onMouseEnter={(e) => { e.target.getStage()!.container().style.cursor = 'grab'; }}
             onMouseLeave={(e) => { e.target.getStage()!.container().style.cursor = 'default'; }}

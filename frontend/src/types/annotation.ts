@@ -14,6 +14,9 @@ export interface Annotation {
   occluded: boolean;
   source: 'manual' | 'auto' | 'interpolated';
   groupId: number;
+  updatedAt?: string;
+  conflict?: any;
+  saveError?: any;
 }
 
 export interface Label {

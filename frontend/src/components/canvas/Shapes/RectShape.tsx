@@ -3,6 +3,8 @@ import { Rect } from 'react-konva';
 import type Konva from 'konva';
 import { useAnnotationStore } from '../../../store/annotationStore';
 import type { Annotation, Label } from '../../../types/annotation';
+import { useHistoryStore } from '../../../store/historyStore';
+import { ReplacePointsCommand } from '../../../commands/AnnotationCommands';
 
 interface Props {
   annotation: Annotation;
@@ -15,6 +17,8 @@ interface Props {
 export const RectShape: React.FC<Props> = ({ annotation, label, selected, nodeRefs, onSelect }) => {
   const ref = useRef<Konva.Rect>(null);
   const replaceAnnotation = useAnnotationStore((s) => s.replaceAnnotation);
+  const execute = useHistoryStore((s) => s.execute);
+  const dragStartRef = useRef<number[] | null>(null);
 
   // Register node for the Transformer to attach to
   useEffect(() => {
@@ -44,16 +48,22 @@ export const RectShape: React.FC<Props> = ({ annotation, label, selected, nodeRe
       hitStrokeWidth={8}
       draggable
       onClick={onSelect}
+      onDragStart={() => { dragStartRef.current = [...annotation.points]; }}
       onDragEnd={(e) => {
         // Dragging the whole rect: translate all 4 coords by delta.
         // Konva moves the node to (newX, newY); we derive delta from current.
         const node = e.target;
         const dx = node.x() - left;
         const dy = node.y() - top;
-        replaceAnnotation(annotation.id, {
-          points: [x1 + dx, y1 + dy, x2 + dx, y2 + dy],
-        });
+        const to = [
+          annotation.points[0] + dx, annotation.points[1] + dy,
+          annotation.points[2] + dx, annotation.points[3] + dy,
+        ];
+        execute(new ReplacePointsCommand([
+          { id: annotation.id, from: dragStartRef.current!, to },
+        ]));
       }}
+      onTransformStart={() => { dragStartRef.current = [...annotation.points]; }}
       onTransformEnd={() => {
         const node = ref.current!;
         // Konva has scaled the node; we rebuild absolute points and reset the node
@@ -70,11 +80,10 @@ export const RectShape: React.FC<Props> = ({ annotation, label, selected, nodeRe
         node.scaleX(1);
         node.scaleY(1);
 
-        replaceAnnotation(annotation.id, {
-          points: [nx, ny, nx + w, ny + h],
-          // store rotation as a shape attribute for now; promoted to a column on Day 12
-          ...(rot !== 0 ? { rotation: rot } as any : {}),
-        } as any);
+        const to = [nx, ny, nx + w, ny + h];
+        execute(new ReplacePointsCommand([
+          { id: annotation.id, from: dragStartRef.current!, to },
+        ]));
       }}
     />
   );

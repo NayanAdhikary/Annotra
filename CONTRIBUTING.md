@@ -30,3 +30,24 @@ Rules:
 3. Never write `scaleX` on any shape; only on the Stage.
 4. Handles (vertex circles, transformer anchors) divide their size by scale
    so they stay constant on screen.
+
+## Undo/Redo Architecture (Command Pattern)
+
+**Why commands, not snapshots:**
+Two ways to implement undo:
+- **Snapshot:** before each mutation, store a deep copy of annotations. Undo = restore the snapshot. Simple to write, but memory explodes on a task with 5,000 annotations — one bad wheel-drag can hold 50MB.
+- **Command (inverse operation):** every mutation is an object with `apply()` and `invert()`. Undo = call `invert()` on the top of the stack. Memory cost = a few coordinate arrays per operation. This is what CVAT does, and this is what Annotra uses.
+
+## Undo/Redo Design
+
+- History is scoped to the current task. Navigating to a different task
+  clears the stack.
+- History is global across frames within a task. Undoing a change made on
+  frame 1 while on frame 3 does not change the current frame.
+- Commands within a 400ms window that have a `coalesceWith` implementation
+  merge into a single history entry.
+- The stack holds up to 100 entries; older entries are dropped.
+- Every mutation in the store MUST go through `useHistoryStore.execute()`.
+  Direct calls to `addLocal`, `removeLocal`, `replaceMany` are only allowed
+  from inside `makeContext()` and during in-progress drags (which commit a
+  single command on drag end).

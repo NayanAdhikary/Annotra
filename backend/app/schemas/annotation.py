@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Any, Literal
+from datetime import datetime
 from enum import Enum
 
 
@@ -62,6 +63,7 @@ class AnnotationResponse(BaseModel):
     occluded: bool
     source: str
     group_id: int
+    updated_at: datetime
 
     class Config:
         from_attributes = True
