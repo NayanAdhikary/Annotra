@@ -1,41 +1,47 @@
-import { useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { AnnotatePage } from './pages/AnnotatePage';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { ProjectsPage } from './pages/ProjectsPage';
+import { ProjectDetailPage } from './pages/ProjectDetailPage';
+import { TaskSetupPage } from './pages/TaskSetupPage';
+import { AnnotatePage } from './pages/AnnotatePage';
 import { ProtectedRoute } from './routes/ProtectedRoute';
+import { AppLayout } from './components/Layout/AppLayout';
 import { useAuthStore } from './store/authStore';
 import { authApi } from './api/auth';
 
-function App() {
-  const { accessToken, setSession, clear } = useAuthStore();
+export const App: React.FC = () => {
+  const { accessToken, setUser } = useAuthStore();
 
   useEffect(() => {
-    // Bootstrap session on mount if token exists
-    if (accessToken) {
-      authApi.me()
-        .then(user => {
-          setSession(user, accessToken, useAuthStore.getState().refreshToken || '');
-        })
-        .catch(() => {
-          clear();
-        });
-    }
-  }, []);
+    if (!accessToken) return;
+    authApi.me().then(setUser).catch(() => useAuthStore.getState().clear());
+  }, [accessToken, setUser]);
 
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      
-      {/* Protected Routes */}
-      <Route element={<ProtectedRoute />}>
-        {/* For now, just rendering AnnotatePage at / as a placeholder for a projects list */}
-        <Route path="/" element={<AnnotatePage taskId={1} />} />
-        <Route path="/task/:taskId" element={<AnnotatePage taskId={1} />} />
-      </Route>
-    </Routes>
-  );
-}
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
 
-export default App;
+        <Route path="/" element={
+          <ProtectedRoute><AppLayout><ProjectsPage /></AppLayout></ProtectedRoute>
+        } />
+        <Route path="/projects/:projectId" element={
+          <ProtectedRoute><AppLayout><ProjectDetailPage /></AppLayout></ProtectedRoute>
+        } />
+        <Route path="/tasks/:taskId/setup" element={
+          <ProtectedRoute><AppLayout><TaskSetupPage /></AppLayout></ProtectedRoute>
+        } />
+
+        {/* Workspace — full-screen, no layout */}
+        <Route path="/tasks/:taskId" element={
+          <ProtectedRoute><AnnotatePage /></ProtectedRoute>
+        } />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};

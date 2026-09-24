@@ -14,8 +14,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-os.makedirs("data/images", exist_ok=True)
-app.mount("/static/images", StaticFiles(directory="data/images"), name="images")
+os.makedirs("/data/images", exist_ok=True)
+app.mount("/static/images", StaticFiles(directory="/data/images"), name="images")
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(projects.router, prefix="/api", tags=["projects"])
