@@ -15,3 +15,18 @@ When building or modifying components in this application, you must adhere to th
 
 4. **Debounced Persistence**
    Never call mutating API endpoints directly from high-frequency UI events like Konva `onDragMove` or `onTransform`. Instead, update the local Zustand store and rely on `useDebouncedPersist` to automatically coalesce these local changes into a single API request after interaction pauses.
+
+## Coordinate Model
+
+- **Image space**: pixel coordinates of the source image. All annotations, all
+  hits, all geometry live here. Never changes with viewport.
+- **Screen space**: pixels inside the Konva container. Used only for zoom
+  anchors and drag deltas.
+- **Konva Stage x/y/scaleX/scaleY**: the one-way transform image → screen.
+
+Rules:
+1. Never call `getPointerPosition()` outside `usePan` and `useZoom`.
+2. Use `getRelativePointerPosition()` in all drawing code — it returns image space.
+3. Never write `scaleX` on any shape; only on the Stage.
+4. Handles (vertex circles, transformer anchors) divide their size by scale
+   so they stay constant on screen.

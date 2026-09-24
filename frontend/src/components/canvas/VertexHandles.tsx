@@ -3,13 +3,12 @@ import { Circle, Group } from 'react-konva';
 import { useAnnotationStore } from '../../store/annotationStore';
 import type { Annotation } from '../../types/annotation';
 
-const VERTEX_R = 5;
-const MIDPOINT_R = 3.5;
 const COLOR = '#00E5FF';
 const MID_COLOR = '#FFC400';
 
 interface Props {
   annotation: Annotation;
+  scale: number;
 }
 
 /**
@@ -18,7 +17,10 @@ interface Props {
  *  - one small midpoint circle per edge (click to insert a vertex)
  *  - Alt+click on a vertex deletes it (if it would leave >= min vertices)
  */
-export const VertexHandles: React.FC<Props> = ({ annotation }) => {
+export const VertexHandles: React.FC<Props> = ({ annotation, scale }) => {
+  const VERTEX_R = 5 / scale;
+  const MIDPOINT_R = 3.5 / scale;
+  const STROKE_W = 1 / scale;
   const replaceAnnotation = useAnnotationStore((s) => s.replaceAnnotation);
   const pts = annotation.points;
   const n = pts.length / 2;
@@ -67,7 +69,7 @@ export const VertexHandles: React.FC<Props> = ({ annotation }) => {
             radius={MIDPOINT_R}
             fill={MID_COLOR}
             stroke="#000"
-            strokeWidth={1}
+            strokeWidth={STROKE_W}
             opacity={0.6}
             onClick={(e) => { e.cancelBubble = true; insertVertexAt(i); }}
             onMouseEnter={(e) => { e.target.getStage()!.container().style.cursor = 'copy'; }}
@@ -87,7 +89,7 @@ export const VertexHandles: React.FC<Props> = ({ annotation }) => {
             radius={VERTEX_R}
             fill={i === 0 && isClosed ? '#FFC400' : COLOR}
             stroke="#000"
-            strokeWidth={1}
+            strokeWidth={STROKE_W}
             draggable
             onClick={(e) => {
               e.cancelBubble = true;

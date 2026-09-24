@@ -178,6 +178,7 @@ export const AnnotatePage: React.FC = () => {
         <div className="flex-1 flex items-center justify-center bg-slate-100 overflow-auto p-8">
           <div className="bg-white border border-slate-300 shadow-md rounded-sm overflow-hidden flex items-center justify-center">
             <AnnotationCanvas
+              taskId={id}
               imageUrl={current.url}
               width={current.width}
               height={current.height}

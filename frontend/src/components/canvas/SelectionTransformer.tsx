@@ -8,6 +8,7 @@ interface Props {
   stageRef: React.RefObject<Konva.Stage>;
   nodeRefs: React.MutableRefObject<Record<string, Konva.Node | null>>;
   enabled: boolean;
+  scale: number;
 }
 
 /**
@@ -18,7 +19,7 @@ interface Props {
  * to rectangles because their geometry is axis-aligned and maps cleanly to
  * scaleX / scaleY.
  */
-export const SelectionTransformer: React.FC<Props> = ({ stageRef, nodeRefs, enabled }) => {
+export const SelectionTransformer: React.FC<Props> = ({ stageRef, nodeRefs, enabled, scale }) => {
   const trRef = useRef<Konva.Transformer>(null);
   const selectedIds = useAnnotationStore((s) => s.selectedIds);
   const annotations = useAnnotationStore((s) => s.annotations);
@@ -44,13 +45,15 @@ export const SelectionTransformer: React.FC<Props> = ({ stageRef, nodeRefs, enab
       ref={trRef}
       rotateEnabled
       keepRatio={false}
-      anchorSize={8}
+      anchorSize={8 / scale}
       anchorStroke="#00E5FF"
-      anchorCornerRadius={2}
+      anchorStrokeWidth={1 / scale}
+      anchorCornerRadius={2 / scale}
       anchorFill="#FFFFFF"
       borderStroke="#00E5FF"
-      borderDash={[4, 4]}
-      rotateAnchorOffset={24}
+      borderDash={[4 / scale, 4 / scale]}
+      borderStrokeWidth={1 / scale}
+      rotateAnchorOffset={24 / scale}
       boundBoxFunc={(oldBox, newBox) => {
         // Disallow flipping to negative dimensions
         if (newBox.width < 5 || newBox.height < 5) return oldBox;

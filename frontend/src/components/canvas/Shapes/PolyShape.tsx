@@ -20,6 +20,7 @@ export const PolyShape: React.FC<Props> = ({ annotation, label, selected, onSele
         closed={isClosed}
         stroke={selected ? '#00E5FF' : color}
         strokeWidth={selected ? 2.5 : 2}
+        strokeScaleEnabled={false}
         fill={isClosed ? `${color}22` : undefined}
         hitStrokeWidth={10}
         onClick={onSelect}
@@ -35,6 +36,7 @@ export const PolyShape: React.FC<Props> = ({ annotation, label, selected, onSele
             fill={color}
             stroke="#fff"
             strokeWidth={1}
+            strokeScaleEnabled={false}
             listening={false}
           />
         ))}

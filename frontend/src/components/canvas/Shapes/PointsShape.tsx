@@ -33,6 +33,7 @@ export const PointsShape: React.FC<Props> = ({ annotation, label, selected, onSe
           fill={color}
           stroke={selected ? '#00E5FF' : '#000'}
           strokeWidth={selected ? 2 : 1}
+          strokeScaleEnabled={false}
           draggable={selected}
           onClick={onSelect}
           onDragMove={(e) => moveVertex(i, e.target.x(), e.target.y())}

@@ -39,6 +39,7 @@ export const RectShape: React.FC<Props> = ({ annotation, label, selected, nodeRe
       rotation={rotation}
       stroke={selected ? '#00E5FF' : label?.color ?? '#FF0000'}
       strokeWidth={selected ? 2.5 : 2}
+      strokeScaleEnabled={false}
       fill={label?.color ? `${label.color}22` : 'rgba(255,0,0,0.08)'}
       hitStrokeWidth={8}
       draggable
