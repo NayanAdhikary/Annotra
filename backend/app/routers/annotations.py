@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from typing import List
+from app.services.audit import audit
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -151,9 +152,12 @@ async def update_annotation(ann_id: int, payload: AnnotationUpdate,
 
 @router.delete("/annotations/{ann_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_annotation(ann_id: int,
+                            request: Request,
                             db: AsyncSession = Depends(get_db),
                             user: User = Depends(get_current_user)):
     ann = await _assert_can_edit(db, ann_id, user)
+    await audit(db, user=user, action="annotation.delete",
+                resource_type="annotation", resource_id=ann.id, request=request)
     await db.execute(delete(Annotation).where(Annotation.id == ann_id))
     await db.commit()
 
@@ -221,6 +225,7 @@ async def bulk_patch(
 async def bulk_delete(
     task_id: int,
     ids: List[int],
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -238,5 +243,8 @@ async def bulk_delete(
             status.HTTP_404_NOT_FOUND,
             f"Expected {len(ids)} annotations, found {res.rowcount}",
         )
+    await audit(db, user=user, action="annotation.delete",
+                resource_type="annotation", meta={"ids": ids, "count": res.rowcount},
+                request=request)
     await db.commit()
     return {"deleted": res.rowcount}

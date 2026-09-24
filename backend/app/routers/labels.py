@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func
 from typing import List
+from app.services.audit import audit
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -40,6 +41,7 @@ async def list_labels(task_id: int, db: AsyncSession = Depends(get_db)):
              response_model=LabelResponse,
              status_code=status.HTTP_201_CREATED)
 async def create_label(task_id: int, payload: LabelCreate,
+                       request: Request,
                        db: AsyncSession = Depends(get_db),
                        user: User = Depends(get_current_user)):
     # Ensure task exists and user can edit it
@@ -54,6 +56,10 @@ async def create_label(task_id: int, payload: LabelCreate,
 
     label = Label(task_id=task_id, name=payload.name, color=payload.color)
     db.add(label)
+    await db.flush()
+    await audit(db, user=user, action="label.create",
+                resource_type="label", resource_id=label.id,
+                meta={"name": label.name}, request=request)
     await db.commit()
     await db.refresh(label)
     return label
@@ -73,7 +79,7 @@ async def update_label(label_id: int, payload: LabelUpdate,
 
 
 @router.delete("/labels/{label_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_label(label_id: int, force: bool = False,
+async def delete_label(label_id: int, request: Request, force: bool = False,
                        db: AsyncSession = Depends(get_db),
                        user: User = Depends(get_current_user)):
     """
@@ -96,6 +102,9 @@ async def delete_label(label_id: int, force: bool = False,
     if count > 0:
         await db.execute(delete(Annotation).where(Annotation.label_id == label_id))
 
+    await audit(db, user=user, action="label.delete",
+                resource_type="label", resource_id=label.id,
+                meta={"name": label.name}, request=request)
     await db.delete(label)
     await db.commit()
 

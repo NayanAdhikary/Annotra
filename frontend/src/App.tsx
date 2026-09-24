@@ -10,6 +10,12 @@ import { ProtectedRoute } from './routes/ProtectedRoute';
 import { AppLayout } from './components/Layout/AppLayout';
 import { useAuthStore } from './store/authStore';
 import { authApi } from './api/auth';
+import { AdminLayout } from './components/Admin/AdminLayout';
+import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
+import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+import { AdminUserDetailPage } from './pages/admin/AdminUserDetailPage';
+import { AdminAuditPage } from './pages/admin/AdminAuditPage';
+import { AdminHealthPage } from './pages/admin/AdminHealthPage';
 
 export const App: React.FC = () => {
   const { accessToken, setUser } = useAuthStore();
@@ -38,6 +44,33 @@ export const App: React.FC = () => {
         {/* Workspace — full-screen, no layout */}
         <Route path="/tasks/:taskId" element={
           <ProtectedRoute><AnnotatePage /></ProtectedRoute>
+        } />
+
+        {/* Admin section */}
+        <Route path="/admin" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout><AdminDashboardPage /></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/users" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout><AdminUsersPage /></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/users/:userId" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout><AdminUserDetailPage /></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/audit" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout><AdminAuditPage /></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/health" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout><AdminHealthPage /></AdminLayout>
+          </ProtectedRoute>
         } />
 
         <Route path="*" element={<Navigate to="/" replace />} />

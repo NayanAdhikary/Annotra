@@ -1,0 +1,70 @@
+import React, { useEffect, useState } from 'react';
+import { adminApi, HealthReport } from '../../api/admin';
+
+const Dot: React.FC<{ ok: boolean; label: string; sub?: string }> = ({ ok, label, sub }) => (
+  <div className="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-lg">
+    <div className={`w-2.5 h-2.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-red-500'}`} />
+    <div className="flex-1">
+      <div className="text-sm font-medium text-slate-900">{label}</div>
+      {sub && <div className="text-xs text-slate-500">{sub}</div>}
+    </div>
+    <div className={`text-xs font-medium ${ok ? 'text-emerald-600' : 'text-red-600'}`}>
+      {ok ? 'Healthy' : 'Down'}
+    </div>
+  </div>
+);
+
+export const AdminHealthPage: React.FC = () => {
+  const [h, setH] = useState<HealthReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    setLoading(true);
+    adminApi.health().then(setH).finally(() => setLoading(false));
+  }, [tick]);
+
+  // Auto-refresh every 15s
+  useEffect(() => {
+    const t = setInterval(() => setTick((x) => x + 1), 15_000);
+    return () => clearInterval(t);
+  }, []);
+
+  if (loading && !h) return <div className="p-8 text-slate-500">Loading…</div>;
+  if (!h) return null;
+
+  return (
+    <div className="p-6 max-w-3xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">System health</h2>
+          <p className="text-sm text-slate-500 mt-1">Refreshes every 15 seconds.</p>
+        </div>
+        <button onClick={() => setTick((x) => x + 1)}
+                className="px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50">
+          Refresh now
+        </button>
+      </div>
+
+      <div className="grid gap-3">
+        <Dot ok={h.database} label="PostgreSQL" sub="Primary data store" />
+        <Dot ok={h.redis} label="Redis" sub={`${h.pending_jobs} jobs pending`} />
+        <Dot ok={h.storage_writable} label="Object storage" sub="/data is writable" />
+        <Dot ok={h.celery_workers > 0} label="Celery workers"
+             sub={`${h.celery_workers} workers online`} />
+      </div>
+
+      <section className="mt-6 bg-white border border-slate-200 rounded-lg p-4">
+        <h3 className="text-sm font-medium text-slate-900 mb-2">Versions</h3>
+        <dl className="text-sm grid grid-cols-2 gap-2">
+          {Object.entries(h.versions).map(([k, v]) => (
+            <React.Fragment key={k}>
+              <dt className="text-slate-500">{k}</dt>
+              <dd className="text-slate-900 font-mono">{v}</dd>
+            </React.Fragment>
+          ))}
+        </dl>
+      </section>
+    </div>
+  );
+};

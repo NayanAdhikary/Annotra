@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List
+from app.services.audit import audit
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -65,6 +66,7 @@ async def list_projects(
              status_code=status.HTTP_201_CREATED)
 async def create_project(
     payload: ProjectCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -74,6 +76,10 @@ async def create_project(
         owner_id=user.id,
     )
     db.add(project)
+    await db.flush()
+    await audit(db, user=user, action="project.create",
+                resource_type="project", resource_id=project.id,
+                meta={"name": project.name}, request=request)
     await db.commit()
     await db.refresh(project)
     return ProjectResponse(
@@ -101,10 +107,14 @@ async def get_project(
 @router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
     project_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     project = await _assert_project_access(db, project_id, user)
+    await audit(db, user=user, action="project.delete",
+                resource_type="project", resource_id=project.id,
+                meta={"name": project.name}, request=request)
     await db.delete(project)
     await db.commit()
 
@@ -153,6 +163,7 @@ async def list_tasks(
 async def create_task(
     project_id: int,
     payload: TaskCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -162,6 +173,10 @@ async def create_task(
 
     task = Task(project_id=project_id, name=payload.name, task_type=payload.task_type)
     db.add(task)
+    await db.flush()
+    await audit(db, user=user, action="task.create",
+                resource_type="task", resource_id=task.id,
+                meta={"name": task.name}, request=request)
     await db.commit()
     await db.refresh(task)
     return TaskResponse(
