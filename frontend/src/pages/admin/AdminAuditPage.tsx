@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { adminApi, AuditEntry } from '../../api/admin';
+import { useAuthStore } from '../../store/authStore';
 
 const ACTION_COLOR = (action: string) => {
   if (action.includes('delete')) return 'text-red-700 bg-red-50';
@@ -17,6 +18,7 @@ export const AdminAuditPage: React.FC = () => {
   const [resourceType, setResourceType] = useState('');
   const [offset, setOffset] = useState(0);
   const LIMIT = 100;
+  const token = useAuthStore((s) => s.accessToken);
 
   useEffect(() => {
     setLoading(true);
@@ -35,11 +37,33 @@ export const AdminAuditPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-slate-900">Audit log</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          {total.toLocaleString()} events recorded
-        </p>
+      <div className="mb-6 flex justify-between items-start">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">Audit log</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            {total.toLocaleString()} events recorded
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            const params = new URLSearchParams();
+            if (action) params.set('action', action);
+            if (resourceType) params.set('resource_type', resourceType);
+            const url = `/api/admin/audit/export?${params.toString()}`;
+            // Fetch with auth header, then trigger download via blob
+            fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+              .then((r) => r.blob())
+              .then((blob) => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+                link.click();
+              });
+          }}
+          className="px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50"
+        >
+          Export CSV
+        </button>
       </div>
 
       <div className="flex gap-3 mb-4">

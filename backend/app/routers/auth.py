@@ -17,8 +17,24 @@ from app.schemas.auth import (
     RegisterRequest, LoginRequest, RefreshRequest, ChangePasswordRequest,
     TokenPair, UserResponse,
 )
+from app.services.config import get_value
 
 router = APIRouter()
+
+async def _validate_password(db: AsyncSession, password: str) -> None:
+    min_length = await get_value(db, "auth.password_min_length", 8)
+    require_digit = await get_value(db, "auth.password_require_digit", True)
+    require_letter = await get_value(db, "auth.password_require_letter", True)
+
+    errors = []
+    if len(password) < min_length:
+        errors.append(f"Password must be at least {min_length} characters")
+    if require_digit and not any(c.isdigit() for c in password):
+        errors.append("Password must contain at least one digit")
+    if require_letter and not any(c.isalpha() for c in password):
+        errors.append("Password must contain at least one letter")
+    if errors:
+        raise HTTPException(422, "; ".join(errors))
 
 
 def _to_response(u: User) -> UserResponse:
@@ -50,7 +66,12 @@ async def _issue_token_pair(db: AsyncSession, user: User, request: Request) -> T
 @router.post("/register", response_model=TokenPair, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, request: Request,
                    db: AsyncSession = Depends(get_db)):
+    registration_open = await get_value(db, "features.registration_open", True)
+    if not registration_open:
+        raise HTTPException(403, "Self-registration is disabled")
+
     await rate_limit(request, key=f"register:{request.client.host}", limit=10, window=3600)
+    await _validate_password(db, payload.password)
 
     existing = (await db.execute(
         select(User).where((User.email == payload.email) | (User.username == payload.username))
@@ -141,6 +162,8 @@ async def change_password(
 ):
     if not verify_password(payload.old_password, user.hashed_password):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Old password is incorrect")
+
+    await _validate_password(db, payload.new_password)
 
     user.hashed_password = hash_password(payload.new_password)
     await db.execute(

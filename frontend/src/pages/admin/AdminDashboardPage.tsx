@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi, SystemStats, AuditEntry } from '../../api/admin';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts';
 
 const StatCard: React.FC<{
   label: string; value: string | number; sub?: string; icon: string; accent: string;
@@ -32,6 +35,11 @@ export const AdminDashboardPage: React.FC = () => {
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [recent, setRecent] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [series, setSeries] = useState<{ date: string; annotations: number; active_users: number }[]>([]);
+
+  useEffect(() => {
+    adminApi.analytics(30).then((s: any) => setSeries(s.points));
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -123,6 +131,24 @@ export const AdminDashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <section className="bg-white border border-slate-200 rounded-lg p-4">
+        <h3 className="font-medium text-slate-900 mb-3">Activity (last 30 days)</h3>
+        {series.length === 0 ? (
+          <div className="text-sm text-slate-500 py-12 text-center">No data yet.</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={series} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Line type="monotone" dataKey="annotations" stroke="#6366f1" strokeWidth={2} dot={false} name="Annotations" />
+              <Line type="monotone" dataKey="active_users" stroke="#10b981" strokeWidth={2} dot={false} name="Active users" />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </section>
     </div>
   );
 };

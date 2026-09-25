@@ -16,6 +16,11 @@ import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminUserDetailPage } from './pages/admin/AdminUserDetailPage';
 import { AdminAuditPage } from './pages/admin/AdminAuditPage';
 import { AdminHealthPage } from './pages/admin/AdminHealthPage';
+import { AdminProjectsPage } from './pages/admin/AdminProjectsPage';
+import { AdminTasksPage } from './pages/admin/AdminTasksPage';
+import { AdminApiKeysPage } from './pages/admin/AdminApiKeysPage';
+import { AdminSettingsPage } from './pages/AdminSettingsPage';
+import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage';
 
 export const App: React.FC = () => {
   const { accessToken, setUser } = useAuthStore();
@@ -50,6 +55,31 @@ export const App: React.FC = () => {
         <Route path="/admin" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout><AdminDashboardPage /></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/projects" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout><AdminProjectsPage /></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/tasks" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout><AdminTasksPage /></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/api-keys" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout><AdminApiKeysPage /></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/settings" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout><AdminSettingsPage /></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/notifications" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout><AdminNotificationsPage /></AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/users" element={

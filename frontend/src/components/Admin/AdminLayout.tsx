@@ -4,9 +4,14 @@ import { UserMenu } from '../Layout/UserMenu';
 
 const NAV = [
   { to: '/admin', label: 'Dashboard', icon: '▤', end: true },
+  { to: '/admin/projects', label: 'Projects', icon: '◫' },
+  { to: '/admin/tasks', label: 'Tasks', icon: '☰' },
   { to: '/admin/users', label: 'Users', icon: '◉' },
   { to: '/admin/audit', label: 'Audit log', icon: '≡' },
-  { to: '/admin/health', label: 'System health', icon: '✚' },
+  { to: '/admin/api-keys', label: 'API keys', icon: '🔑' },
+  { to: '/admin/settings', label: 'Settings', icon: '⚙' },
+  { to: '/admin/notifications', label: 'Announcements', icon: '📢' },
+  { to: '/admin/health', label: 'Health', icon: '✚' },
 ];
 
 export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
