@@ -61,3 +61,4 @@ def downgrade() -> None:
 
     op.drop_table('audit_logs')
     # ### end Alembic commands ###
+

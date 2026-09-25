@@ -42,3 +42,4 @@ def downgrade() -> None:
         batch_op.drop_column('review_status')
 
     # ### end Alembic commands ###
+

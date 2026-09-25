@@ -6,7 +6,7 @@ token = None
 print("1. Register first user (becomes admin)")
 try:
     r1 = requests.post(f"{BASE_URL}/api/auth/register", json={
-        "email": "admin@annotra.local",
+        "email": "admin@example.com",
         "username": "admin",
         "password": "Passw0rd!",
         "full_name": "Admin"
@@ -20,14 +20,14 @@ try:
         print("Registration failed, trying to login as admin to get token...")
         # might be standard oauth2 x-www-form-urlencoded
         r_login = requests.post(f"{BASE_URL}/api/auth/login", data={
-            "username": "admin@annotra.local",
+            "username": "admin@example.com",
             "password": "Passw0rd!"
         })
         if r_login.status_code == 200:
             token = r_login.json().get("access_token")
         else:
             r_login = requests.post(f"{BASE_URL}/api/auth/login", json={
-                "email": "admin@annotra.local",
+                "email": "admin@example.com",
                 "password": "Passw0rd!"
             })
             token = r_login.json().get("access_token")
@@ -39,7 +39,7 @@ try:
 
     print("\n3. Register a second user (becomes annotator)")
     r3 = requests.post(f"{BASE_URL}/api/auth/register", json={
-        "email": "a@annotra.local",
+        "email": "a@example.com",
         "username": "annotator1",
         "password": "Passw0rd!",
         "full_name": "A"
@@ -48,12 +48,12 @@ try:
 
     print("\n4. Login as admin")
     r4 = requests.post(f"{BASE_URL}/api/auth/login", json={
-        "email": "admin@annotra.local",
+        "email": "admin@example.com",
         "password": "Passw0rd!"
     })
     if r4.status_code == 422: # might expect form data
         r4 = requests.post(f"{BASE_URL}/api/auth/login", data={
-            "username": "admin@annotra.local",
+            "username": "admin@example.com",
             "password": "Passw0rd!"
         })
     print(f"Status: {r4.status_code}\nBody: {r4.text}")

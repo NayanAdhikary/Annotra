@@ -6,6 +6,7 @@ import { ProjectsPage } from './pages/ProjectsPage';
 import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { TaskSetupPage } from './pages/TaskSetupPage';
 import { AnnotatePage } from './pages/AnnotatePage';
+import { VideoAnnotatePage } from './pages/VideoAnnotatePage';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { AppLayout } from './components/Layout/AppLayout';
 import { useAuthStore } from './store/authStore';
@@ -49,6 +50,9 @@ export const App: React.FC = () => {
         {/* Workspace — full-screen, no layout */}
         <Route path="/tasks/:taskId" element={
           <ProtectedRoute><AnnotatePage /></ProtectedRoute>
+        } />
+        <Route path="/tasks/:taskId/videos/:videoId" element={
+          <ProtectedRoute><VideoAnnotatePage /></ProtectedRoute>
         } />
 
         {/* Admin section */}

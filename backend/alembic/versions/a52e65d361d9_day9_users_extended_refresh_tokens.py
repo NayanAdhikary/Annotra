@@ -48,3 +48,4 @@ def downgrade() -> None:
         batch_op.drop_column('full_name')
 
     # ### end Alembic commands ###
+

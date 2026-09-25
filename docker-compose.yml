@@ -16,5 +16,14 @@ services:
     ports:
       - "6379:6379"
 
+  worker:
+    build: ./backend
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./data:/data
+
 volumes:
   pgdata:

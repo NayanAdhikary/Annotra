@@ -18,6 +18,12 @@ class Annotation(Base):
     source = Column(String(10), default="manual")
     group_id = Column(Integer, default=0)
     
+    # Video tracking. NULL track_id = image-style shape (still valid).
+    track_id     = Column(BigInteger, index=True, nullable=True)
+    is_keyframe  = Column(Boolean, default=True, nullable=False)
+    # If True, this keyframe marks the LAST frame of the track (object left the scene)
+    outside      = Column(Boolean, default=False, nullable=False)
+    
     review_status = Column(String(20), default="pending", nullable=False, index=True)
     # "pending" | "accepted" | "rejected" | "fixed"
     reviewed_by   = Column(BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

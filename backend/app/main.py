@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import os
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, projects, tasks, annotations, labels, images, admin, announcements
+from app.routers import auth, projects, tasks, annotations, labels, images, admin, announcements, videos
 
 app = FastAPI(title="Annotra API", version="0.1.0")
 
@@ -17,6 +17,11 @@ app.add_middleware(
 os.makedirs("/data/images", exist_ok=True)
 app.mount("/static/images", StaticFiles(directory="/data/images"), name="images")
 
+os.makedirs("/data/videos", exist_ok=True)
+os.makedirs("/data/frames", exist_ok=True)
+app.mount("/static/videos", StaticFiles(directory="/data/videos"), name="videos")
+app.mount("/static/frames", StaticFiles(directory="/data/frames"), name="frames")
+
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(projects.router, prefix="/api", tags=["projects"])
 app.include_router(annotations.router, prefix="/api", tags=["annotations"])
@@ -25,6 +30,7 @@ app.include_router(labels.router, prefix="/api", tags=["labels"])
 app.include_router(images.router, prefix="/api", tags=["images"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(announcements.router, prefix="/api", tags=["announcements"])
+app.include_router(videos.router, prefix="/api", tags=["videos"])
 @app.get("/health")
 async def health():
     return {"status": "ok"}

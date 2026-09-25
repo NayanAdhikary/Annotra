@@ -32,3 +32,4 @@ def downgrade() -> None:
         batch_op.drop_column('updated_at')
 
     # ### end Alembic commands ###
+
