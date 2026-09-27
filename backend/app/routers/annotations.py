@@ -63,6 +63,7 @@ async def create_annotation(
         attributes=payload.attributes,
         occluded=payload.occluded,
         group_id=payload.group_id,
+        created_by=user.id,
     )
     db.add(ann)
     await db.commit()
@@ -90,6 +91,7 @@ async def bulk_create(task_id: int, payload: BulkAnnotationCreate,
             attributes=item.attributes,
             occluded=item.occluded,
             group_id=item.group_id,
+            created_by=user.id,
         )
         db.add(ann)
         created.append(ann)

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { adminApi, AdminUser, Role } from '../../api/admin';
+import { adminApi, type AdminUser, type Role } from '../../api/admin';
 import { useAuthStore } from '../../store/authStore';
 
 const ROLES: Role[] = ['admin', 'manager', 'annotator', 'reviewer', 'observer'];

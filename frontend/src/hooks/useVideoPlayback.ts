@@ -11,7 +11,7 @@ export function useVideoPlayback(fps: number) {
   const stepFrame = useVideoStore((s) => s.stepFrame);
   const frameCount = useVideoStore((s) => s.frameUrls.length);
 
-  const rafRef = useRef<number>();
+  const rafRef = useRef<number>(0);
   const lastTickRef = useRef<number>(0);
 
   useEffect(() => {

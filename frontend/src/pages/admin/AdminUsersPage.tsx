@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { adminApi, AdminUser, Role } from '../../api/admin';
+import { adminApi, type AdminUser, type Role } from '../../api/admin';
 
 const ROLES: Role[] = ['admin', 'manager', 'annotator', 'reviewer', 'observer'];
 

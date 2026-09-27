@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { adminApi, HealthReport } from '../../api/admin';
+import { adminApi, type HealthReport } from '../../api/admin';
 
 const Dot: React.FC<{ ok: boolean; label: string; sub?: string }> = ({ ok, label, sub }) => (
   <div className="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-lg">

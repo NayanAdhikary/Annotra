@@ -1,17 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from typing import List
 from app.services.audit import audit
-
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.user import User, UserRole
-from app.models.task import Project, Task, Label, ImageAsset
+from app.models.task import Project, Task, Label, ImageAsset, TaskComment
+from app.models.task_assignment import TaskAssignment
 from app.models.annotation import Annotation
 from app.schemas.project import (
-    ProjectCreate, ProjectResponse, TaskCreate, TaskResponse,
+    ProjectCreate, ProjectResponse, TaskCreate, TaskResponse, TaskUpdate, TaskTransition,
+    CommentCreate, CommentResponse, CommentUpdate, MyTaskRow
 )
+from app.services.task_workflow import transition_task
 
 router = APIRouter()
 
@@ -134,6 +136,43 @@ async def _task_stats(db: AsyncSession, task_id: int) -> tuple[int, int, int]:
     )).scalar_one()
     return ic, lc, ac
 
+async def _task_response(db: AsyncSession, t: Task) -> TaskResponse:
+    project = await db.get(Project, t.project_id)
+    ic, lc, ac = await _task_stats(db, t.id)
+
+    comment_count = (await db.execute(
+        select(func.count()).select_from(TaskComment).where(TaskComment.task_id == t.id)
+    )).scalar_one()
+    open_comments = (await db.execute(
+        select(func.count()).select_from(TaskComment)
+        .where(TaskComment.task_id == t.id, TaskComment.resolved.is_(False))
+    )).scalar_one()
+
+    assigns = (await db.execute(
+        select(TaskAssignment).where(TaskAssignment.task_id == t.id)
+    )).scalars().all()
+    assignees = []
+    for a in assigns:
+        u = await db.get(User, a.user_id)
+        assignees.append({
+            "user_id": a.user_id, "role": a.role,
+            "name": (u.full_name or u.username) if u else None,
+            "email": u.email if u else None,
+        })
+
+    return TaskResponse(
+        id=t.id, project_id=t.project_id,
+        project_name=project.name if project else None,
+        name=t.name, task_type=t.task_type, status=t.status,
+        priority=t.priority, due_at=t.due_at,
+        description=t.description, instructions=t.instructions,
+        image_count=ic, label_count=lc, annotated_count=ac,
+        comment_count=comment_count, open_comment_count=open_comments,
+        assignees=assignees,
+        archived_at=t.archived_at, completed_at=t.completed_at,
+        created_at=t.created_at, updated_at=t.updated_at,
+    )
+
 
 @router.get("/projects/{project_id}/tasks", response_model=List[TaskResponse])
 async def list_tasks(
@@ -148,13 +187,7 @@ async def list_tasks(
 
     out = []
     for t in tasks:
-        ic, lc, ac = await _task_stats(db, t.id)
-        out.append(TaskResponse(
-            id=t.id, project_id=t.project_id, name=t.name,
-            task_type=t.task_type, status=t.status,
-            image_count=ic, label_count=lc, annotated_count=ac,
-            created_at=t.created_at,
-        ))
+        out.append(await _task_response(db, t))
     return out
 
 
@@ -171,7 +204,11 @@ async def create_task(
     if payload.task_type not in ("image", "video"):
         raise HTTPException(422, "task_type must be 'image' or 'video'")
 
-    task = Task(project_id=project_id, name=payload.name, task_type=payload.task_type)
+    task = Task(
+        project_id=project_id, name=payload.name, task_type=payload.task_type,
+        priority=payload.priority, due_at=payload.due_at,
+        description=payload.description, instructions=payload.instructions
+    )
     db.add(task)
     await db.flush()
     await audit(db, user=user, action="task.create",
@@ -179,27 +216,242 @@ async def create_task(
                 meta={"name": task.name}, request=request)
     await db.commit()
     await db.refresh(task)
-    return TaskResponse(
-        id=task.id, project_id=task.project_id, name=task.name,
-        task_type=task.task_type, status=task.status,
-        image_count=0, label_count=0, annotated_count=0,
-        created_at=task.created_at,
-    )
+    return await _task_response(db, task)
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
-async def get_task(
-    task_id: int,
+async def get_task(task_id: int, db: AsyncSession = Depends(get_db),
+                   user: User = Depends(get_current_user)):
+    t = await db.get(Task, task_id)
+    if t is None:
+        raise HTTPException(404, "Task not found")
+    return await _task_response(db, t)
+
+
+@router.patch("/tasks/{task_id}", response_model=TaskResponse)
+async def update_task(
+    task_id: int, payload: TaskUpdate, request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    task = await db.get(Task, task_id)
-    if task is None:
+    t = await db.get(Task, task_id)
+    if t is None:
         raise HTTPException(404, "Task not found")
-    ic, lc, ac = await _task_stats(db, task_id)
-    return TaskResponse(
-        id=task.id, project_id=task.project_id, name=task.name,
-        task_type=task.task_type, status=task.status,
-        image_count=ic, label_count=lc, annotated_count=ac,
-        created_at=task.created_at,
+    project = await db.get(Project, t.project_id)
+    if project.owner_id != user.id and user.role not in (
+        UserRole.ADMIN.value, UserRole.MANAGER.value,
+    ):
+        raise HTTPException(403, "Not your task")
+
+    changes = payload.model_dump(exclude_unset=True)
+    for k, v in changes.items():
+        setattr(t, k, v)
+
+    if changes:
+        await audit(db, user=user, action="task.update",
+                    resource_type="task", resource_id=t.id,
+                    meta={"fields": list(changes.keys())}, request=request)
+    await db.commit()
+    await db.refresh(t)
+    return await _task_response(db, t)
+
+
+@router.post("/tasks/{task_id}/transition", response_model=TaskResponse)
+async def task_transition(
+    task_id: int, payload: TaskTransition, request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    t = await db.get(Task, task_id)
+    if t is None:
+        raise HTTPException(404, "Task not found")
+
+    old_status = t.status
+    t = await transition_task(db, t, payload.to_status, user)
+
+    await audit(db, user=user, action="task.transition",
+                resource_type="task", resource_id=t.id,
+                meta={"from": old_status, "to": t.status}, request=request)
+    await db.commit()
+    return await _task_response(db, t)
+
+
+# ---------------- Comments ----------------
+
+@router.get("/tasks/{task_id}/comments", response_model=list[CommentResponse])
+async def list_comments(
+    task_id: int,
+    include_resolved: bool = True,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    q = select(TaskComment).where(TaskComment.task_id == task_id)
+    if not include_resolved:
+        q = q.where(TaskComment.resolved.is_(False))
+    q = q.order_by(TaskComment.created_at.asc())
+    rows = (await db.execute(q)).scalars().all()
+    return [CommentResponse.model_validate(r) for r in rows]
+
+
+@router.post("/tasks/{task_id}/comments", response_model=CommentResponse,
+             status_code=201)
+async def create_comment(
+    task_id: int, payload: CommentCreate, request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    t = await db.get(Task, task_id)
+    if t is None:
+        raise HTTPException(404, "Task not found")
+
+    c = TaskComment(
+        task_id=task_id, user_id=user.id,
+        user_email=user.email,
+        user_name=user.full_name or user.username,
+        body=payload.body, frame=payload.frame,
+        annotation_id=payload.annotation_id,
     )
+    db.add(c)
+    await db.flush()
+    await audit(db, user=user, action="task.comment_create",
+                resource_type="task", resource_id=task_id,
+                meta={"comment_id": c.id, "frame": payload.frame},
+                request=request)
+    await db.commit()
+    await db.refresh(c)
+    return CommentResponse.model_validate(c)
+
+
+@router.patch("/comments/{comment_id}", response_model=CommentResponse)
+async def update_comment(
+    comment_id: int, payload: CommentUpdate, request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    c = await db.get(TaskComment, comment_id)
+    if c is None:
+        raise HTTPException(404, "Comment not found")
+
+    # Only the author can edit the body; anyone with task access can resolve
+    if payload.body is not None and c.user_id != user.id:
+        raise HTTPException(403, "Only the author can edit a comment")
+
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(c, k, v)
+
+    await audit(db, user=user, action="task.comment_update",
+                resource_type="task", resource_id=c.task_id,
+                meta={"comment_id": comment_id}, request=request)
+    await db.commit()
+    await db.refresh(c)
+    return CommentResponse.model_validate(c)
+
+
+@router.delete("/comments/{comment_id}", status_code=204)
+async def delete_comment(
+    comment_id: int, request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    c = await db.get(TaskComment, comment_id)
+    if c is None:
+        raise HTTPException(404, "Comment not found")
+    if c.user_id != user.id and user.role not in (
+        UserRole.ADMIN.value, UserRole.MANAGER.value,
+    ):
+        raise HTTPException(403, "Not allowed")
+
+    await audit(db, user=user, action="task.comment_delete",
+                resource_type="task", resource_id=c.task_id,
+                meta={"comment_id": comment_id}, request=request)
+    await db.delete(c)
+    await db.commit()
+
+
+# ---------------- My tasks ----------------
+
+@router.get("/me/tasks", response_model=list[MyTaskRow])
+async def my_tasks(
+    status_filter: str | None = Query(default=None, alias="status"),
+    role: str | None = Query(default=None),  # "annotator" | "reviewer"
+    include_archived: bool = False,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    stmt = (
+        select(Task, TaskAssignment.role)
+        .join(TaskAssignment, TaskAssignment.task_id == Task.id)
+        .where(TaskAssignment.user_id == user.id)
+    )
+    if status_filter:
+        stmt = stmt.where(Task.status == status_filter)
+    if role:
+        stmt = stmt.where(TaskAssignment.role == role)
+    if not include_archived:
+        stmt = stmt.where(Task.status != "archived")
+
+    rows = (await db.execute(stmt.order_by(Task.due_at.asc().nulls_last(),
+                                            Task.created_at.desc()))).all()
+
+    out = []
+    for t, assignment_role in rows:
+        project = await db.get(Project, t.project_id)
+        ic, _, ac = await _task_stats(db, t.id)
+        open_c = (await db.execute(
+            select(func.count()).select_from(TaskComment)
+            .where(TaskComment.task_id == t.id, TaskComment.resolved.is_(False))
+        )).scalar_one()
+        out.append(MyTaskRow(
+            id=t.id, project_id=t.project_id,
+            project_name=project.name if project else "",
+            name=t.name, task_type=t.task_type, status=t.status,
+            priority=t.priority, due_at=t.due_at,
+            role=assignment_role,
+            image_count=ic, annotated_count=ac,
+            open_comment_count=open_c,
+            created_at=t.created_at,
+        ))
+    return out
+
+
+@router.post("/tasks/{task_id}/duplicate", response_model=TaskResponse,
+             status_code=201)
+async def duplicate_task(
+    task_id: int, request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    src = await db.get(Task, task_id)
+    if src is None:
+        raise HTTPException(404, "Task not found")
+    project = await db.get(Project, src.project_id)
+    if project.owner_id != user.id and user.role not in (
+        UserRole.ADMIN.value, UserRole.MANAGER.value,
+    ):
+        raise HTTPException(403, "Not your task")
+
+    clone = Task(
+        project_id=src.project_id,
+        name=f"{src.name} (copy)",
+        task_type=src.task_type,
+        status="annotation",
+        priority=src.priority,
+        description=src.description,
+        instructions=src.instructions,
+    )
+    db.add(clone)
+    await db.flush()
+
+    # Copy labels
+    src_labels = (await db.execute(
+        select(Label).where(Label.task_id == task_id)
+    )).scalars().all()
+    for lab in src_labels:
+        db.add(Label(task_id=clone.id, name=lab.name, color=lab.color))
+
+    await audit(db, user=user, action="task.duplicate",
+                resource_type="task", resource_id=clone.id,
+                meta={"source_task_id": task_id}, request=request)
+    await db.commit()
+    await db.refresh(clone)
+    return await _task_response(db, clone)

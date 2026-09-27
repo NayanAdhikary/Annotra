@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { adminApi, SystemStats, AuditEntry } from '../../api/admin';
+import { adminApi, type SystemStats, type AuditEntry } from '../../api/admin';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';

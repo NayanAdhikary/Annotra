@@ -11,6 +11,7 @@ const NAV = [
   { to: '/admin/api-keys', label: 'API keys', icon: '🔑' },
   { to: '/admin/settings', label: 'Settings', icon: '⚙' },
   { to: '/admin/notifications', label: 'Announcements', icon: '📢' },
+  { to: '/admin/quality', label: 'Quality', icon: '★' },
   { to: '/admin/health', label: 'Health', icon: '✚' },
 ];
 

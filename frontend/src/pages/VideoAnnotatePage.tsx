@@ -2,18 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useVideoStore } from '../store/videoStore';
 import { useAnnotationStore } from '../store/annotationStore';
-import { tasksApi } from '../api/tasks';
+import { taskApi } from '../api/project';
 import { labelsApi } from '../api/labels';
 import { api } from '../api/client';
 import { VideoPlayer } from '../components/Video/VideoPlayer';
 import { TrackList } from '../components/Video/TrackList';
 import { SaveIndicator } from '../components/Status/SaveIndicator';
 import { UserMenu } from '../components/Layout/UserMenu';
+import { tasksApi } from '../api/tasks';
 
 interface Video {
   id: number; task_id: number; filename: string;
   duration_sec: number; fps: number; total_frames: number;
   width: number; height: number; extraction_status: string;
+  extraction_error?: string;
 }
 
 export const VideoAnnotatePage: React.FC = () => {
@@ -25,6 +27,11 @@ export const VideoAnnotatePage: React.FC = () => {
   const [taskName, setTaskName] = useState('');
   const [loading, setLoading] = useState(true);
   const [polling, setPolling] = useState(true);
+  const [taskStatus, setTaskStatus] = useState<string>('');
+
+  useEffect(() => {
+    tasksApi.get(id).then((t) => setTaskStatus(t.status));
+  }, [id]);
 
   const setVideoStore = useVideoStore((s) => s.setVideo);
   const clearVideo = useVideoStore((s) => s.clear);
@@ -37,7 +44,7 @@ export const VideoAnnotatePage: React.FC = () => {
     let cancelled = false;
     (async () => {
       const [task, labels] = await Promise.all([
-        tasksApi.get(id),
+        taskApi.get(id),
         labelsApi.list(id),
       ]);
       if (cancelled) return;
@@ -125,6 +132,23 @@ export const VideoAnnotatePage: React.FC = () => {
         <span className="text-xs text-slate-500 truncate">{video.filename}</span>
         <div className="ml-auto flex items-center gap-3">
           <SaveIndicator />
+          {taskStatus === 'annotation' && (
+            <button
+              onClick={async () => {
+                if (!window.confirm('Submit this task for review?')) return;
+                await tasksApi.transition(id, 'review');
+                setTaskStatus('review');
+              }}
+              className="text-xs px-3 py-1.5 bg-amber-600 text-white rounded hover:bg-amber-700"
+            >
+              Submit for review
+            </button>
+          )}
+          {taskStatus === 'review' && (
+            <span className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded">
+              In review
+            </span>
+          )}
           <UserMenu />
         </div>
       </header>

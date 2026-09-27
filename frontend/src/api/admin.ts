@@ -86,4 +86,21 @@ export const adminApi = {
   } = {}): Promise<AuditPage> => (await api.get('/api/admin/audit', { params })).data,
 
   health: async (): Promise<HealthReport> => (await api.get('/api/admin/health')).data,
+
+  getConfig: async (): Promise<any[]> => (await api.get('/api/admin/config')).data,
+  patchConfig: async (updates: any[]): Promise<void> => (await api.patch('/api/admin/config', updates)).data,
+  listAllProjects: async (...args: any[]): Promise<any[]> => (await api.get('/api/admin/projects')).data,
+  listAllTasks: async (...args: any[]): Promise<any[]> => (await api.get('/api/admin/tasks')).data,
+  assignTask: async (taskId: number, userId: number, ...args: any[]): Promise<void> => (await api.post(`/api/admin/tasks/${taskId}/assign`, { user_id: userId })).data,
+  unassignTask: async (taskId: number, userId: number, ...args: any[]): Promise<void> => (await api.post(`/api/admin/tasks/${taskId}/unassign`, { user_id: userId })).data,
+  listNotifications: async (): Promise<any[]> => (await api.get('/api/admin/notifications')).data,
+  createNotification: async (payload: any): Promise<void> => (await api.post('/api/admin/notifications', payload)).data,
+  deleteNotification: async (id: number): Promise<void> => (await api.delete(`/api/admin/notifications/${id}`)).data,
+  listUserSessions: async (userId: number): Promise<any[]> => (await api.get(`/api/admin/users/${userId}/sessions`)).data,
+  killSession: async (sessionId: number | string): Promise<void> => (await api.delete(`/api/admin/sessions/${sessionId}`)).data,
+  impersonate: async (userId: number): Promise<any> => (await api.post(`/api/admin/users/${userId}/impersonate`)).data,
+  listApiKeys: async (): Promise<any[]> => (await api.get('/api/admin/api-keys')).data,
+  createApiKey: async (name: string, expires_days?: number): Promise<any> => (await api.post('/api/admin/api-keys', { name, expires_days })).data,
+  revokeApiKey: async (keyId: string | number): Promise<void> => (await api.delete(`/api/admin/api-keys/${keyId}`)).data,
+  analytics: async (...args: any[]): Promise<any> => (await api.get('/api/admin/analytics')).data,
 };

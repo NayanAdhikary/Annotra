@@ -5,7 +5,7 @@ import { useAnnotationStore } from '../../store/annotationStore';
 import type { Annotation } from '../../types/annotation';
 
 interface Props {
-  stageRef: React.RefObject<Konva.Stage>;
+  stageRef: React.RefObject<Konva.Stage | null>;
   nodeRefs: React.MutableRefObject<Record<string, Konva.Node | null>>;
   enabled: boolean;
   scale: number;

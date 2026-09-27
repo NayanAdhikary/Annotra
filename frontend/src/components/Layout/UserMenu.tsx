@@ -59,6 +59,17 @@ export const UserMenu: React.FC = () => {
           </div>
           <div style={{ padding: '0.5rem' }}>
             <button 
+              onClick={() => { setIsOpen(false); navigate('/my-tasks'); }}
+              style={{
+                width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.5rem 0.75rem',
+                fontSize: '0.875rem', color: '#374151', cursor: 'pointer', borderRadius: '4px'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              My tasks
+            </button>
+            <button 
               onClick={handleSignOut}
               style={{
                 width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.5rem 0.75rem',

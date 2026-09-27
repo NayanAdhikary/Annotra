@@ -6,6 +6,7 @@ from app.models.audit_log import AuditLog
 from app.models.system_config import SystemConfig
 from app.models.api_key import ApiKey
 from app.models.admin_notification import AdminNotification
+from app.models.task_assignment import TaskAssignment
 
 __all__ = [
     "User",
@@ -19,5 +20,6 @@ __all__ = [
     "AuditLog",
     "SystemConfig",
     "ApiKey",
-    "AdminNotification"
+    "AdminNotification",
+    "TaskAssignment"
 ]

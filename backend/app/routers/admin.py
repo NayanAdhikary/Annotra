@@ -11,7 +11,7 @@ from app.core.security import hash_password
 from app.models.user import User, UserRole
 from app.models.refresh_token import RefreshToken
 import json
-from app.models.task import Project, Task, Label, ImageAsset
+from app.models.task import Project, Task, Label, ImageAsset, TaskComment
 from app.models.annotation import Annotation
 from app.models.audit_log import AuditLog
 from app.models.task_assignment import TaskAssignment
@@ -29,6 +29,7 @@ from app.schemas.admin import (
     BulkUserCreate, AnalyticsPoint, AnalyticsSeries,
     ImpersonateResponse, NotificationCreate, NotificationResponse,
 )
+from app.schemas.project import QualityRow, QualityReport
 from app.routers.projects import _task_stats
 from app.core.security import hash_password, generate_refresh_token
 
@@ -1034,3 +1035,81 @@ async def impersonate(
         expires_in=1800, impersonated_user_id=target.id,
         impersonated_email=target.email,
     )
+
+
+@router.get("/quality", response_model=QualityReport)
+async def quality_report(
+    since: datetime | None = Query(default=None),
+    until: datetime | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    _: User = ADMIN_ONLY,
+):
+    """
+    Per-user annotation quality. Acceptance rate is the key metric.
+    Uses `review_status` on annotations (set in Day 13C) and `reviewed_by`.
+    """
+    if not since:
+        since = datetime.now(timezone.utc) - timedelta(days=30)
+    if not until:
+        until = datetime.now(timezone.utc)
+
+    users = (await db.execute(
+        select(User).where(User.is_active.is_(True)).order_by(User.email)
+    )).scalars().all()
+
+    rows = []
+    for u in users:
+        # Annotations this user created in the window
+        created = (await db.execute(
+            select(func.count()).select_from(Annotation)
+            .where(Annotation.created_at >= since,
+                   Annotation.created_at <= until,
+                   Annotation.created_by == u.id)
+        )).scalar_one()
+
+        accepted = (await db.execute(
+            select(func.count()).select_from(Annotation)
+            .where(Annotation.review_status == "accepted",
+                   Annotation.created_by == u.id)
+        )).scalar_one()
+        rejected = (await db.execute(
+            select(func.count()).select_from(Annotation)
+            .where(Annotation.review_status == "rejected",
+                   Annotation.created_by == u.id)
+        )).scalar_one()
+        fixed = (await db.execute(
+            select(func.count()).select_from(Annotation)
+            .where(Annotation.review_status == "fixed",
+                   Annotation.created_by == u.id)
+        )).scalar_one()
+        pending = (await db.execute(
+            select(func.count()).select_from(Annotation)
+            .where(Annotation.review_status == "pending",
+                   Annotation.created_by == u.id)
+        )).scalar_one()
+
+        denom = accepted + rejected + fixed
+        rate = (accepted / denom) if denom else 0.0
+
+        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        count_7d = (await db.execute(
+            select(func.count()).select_from(Annotation)
+            .where(Annotation.created_at >= week_ago,
+                   Annotation.created_by == u.id)
+        )).scalar_one()
+        avg_per_day = count_7d / 7.0
+
+        rows.append(QualityRow(
+            user_id=u.id, user_email=u.email,
+            user_name=u.full_name or u.username,
+            role=u.role,
+            annotated_count=created,
+            accepted_count=accepted,
+            rejected_count=rejected,
+            fixed_count=fixed,
+            pending_count=pending,
+            acceptance_rate=round(rate, 4),
+            avg_per_day_7d=round(avg_per_day, 1),
+        ))
+
+    return QualityReport(since=since, until=until, rows=rows)

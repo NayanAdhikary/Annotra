@@ -7,6 +7,9 @@ import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { TaskSetupPage } from './pages/TaskSetupPage';
 import { AnnotatePage } from './pages/AnnotatePage';
 import { VideoAnnotatePage } from './pages/VideoAnnotatePage';
+import { MyTasksPage } from './pages/MyTaskPage';
+import { TaskDetailPage } from './pages/TaskDetailPage';
+import { AdminQualityPage } from './pages/admin/AdminQualityPage';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { AppLayout } from './components/Layout/AppLayout';
 import { useAuthStore } from './store/authStore';
@@ -40,8 +43,14 @@ export const App: React.FC = () => {
         <Route path="/" element={
           <ProtectedRoute><AppLayout><ProjectsPage /></AppLayout></ProtectedRoute>
         } />
+        <Route path="/my-tasks" element={
+          <ProtectedRoute><AppLayout><MyTasksPage /></AppLayout></ProtectedRoute>
+        } />
         <Route path="/projects/:projectId" element={
           <ProtectedRoute><AppLayout><ProjectDetailPage /></AppLayout></ProtectedRoute>
+        } />
+        <Route path="/tasks/:taskId/detail" element={
+          <ProtectedRoute><AppLayout><TaskDetailPage /></AppLayout></ProtectedRoute>
         } />
         <Route path="/tasks/:taskId/setup" element={
           <ProtectedRoute><AppLayout><TaskSetupPage /></AppLayout></ProtectedRoute>
@@ -59,6 +68,11 @@ export const App: React.FC = () => {
         <Route path="/admin" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout><AdminDashboardPage /></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/quality" element={
+          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+            <AdminLayout><AdminQualityPage /></AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/projects" element={

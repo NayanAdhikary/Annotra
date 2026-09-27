@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { adminApi } from '../../api/admin';
+import { adminApi } from '../api/admin';
 
 interface ConfigItem {
   key: string;

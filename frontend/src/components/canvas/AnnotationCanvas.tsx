@@ -240,7 +240,6 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
               annotation={a}
               label={labels.find((l) => l.id === a.labelId)}
               selected={selectedIds.includes(a.id)}
-              scale={s}
               nodeRefs={nodeRefs}
               onSelect={(e) => {
                 e.cancelBubble = true;

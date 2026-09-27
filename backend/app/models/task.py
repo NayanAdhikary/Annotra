@@ -1,5 +1,5 @@
 from fastapi import status
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func, Boolean
+from sqlalchemy import Column, Integer, BigInteger, String, ForeignKey, DateTime, func, Boolean, Text
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -12,21 +12,55 @@ class Project(Base):
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    tasks = relationship("Task", back_populates="project")
+    tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
 
 
 class Task(Base):
     __tablename__ = "tasks"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-    name = Column(String(255), nullable=False)
-    task_type = Column(String(20), default="image") #image or video
-    status = Column(String(20), default="annotation")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id            = Column(Integer, primary_key=True, autoincrement=True)
+    project_id    = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"),
+                           nullable=False, index=True)
+    name          = Column(String(255), nullable=False)
+    task_type     = Column(String(20), default="image")  # "image" | "video"
+    status        = Column(String(20), default="annotation", nullable=False, index=True)
+    # "annotation" | "review" | "completed" | "archived"
+
+    priority      = Column(String(20), default="normal", nullable=False, index=True)
+    # "low" | "normal" | "high" | "urgent"
+
+    due_at        = Column(DateTime(timezone=True), nullable=True, index=True)
+    description   = Column(Text, nullable=True)          # short summary
+    instructions  = Column(Text, nullable=True)          # markdown guidelines
+
+    archived_at   = Column(DateTime(timezone=True), nullable=True)
+    completed_at  = Column(DateTime(timezone=True), nullable=True)
+
+    created_at    = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at    = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     project = relationship("Project", back_populates="tasks")
-    labels = relationship("Label", back_populates="task")
+    labels  = relationship("Label", back_populates="task", cascade="all, delete-orphan")
+    comments = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan")
+
+
+class TaskComment(Base):
+    __tablename__ = "task_comments"
+
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    task_id        = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"),
+                            nullable=False, index=True)
+    user_id        = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"),
+                            nullable=True, index=True)
+    user_email     = Column(String(255))   # snapshot
+    user_name      = Column(String(255))
+    body           = Column(Text, nullable=False)
+    frame          = Column(Integer, nullable=True)      # optional: attached to a frame
+    annotation_id  = Column(Integer, nullable=True)   # optional: attached to an annotation
+    resolved       = Column(Boolean, default=False, nullable=False, index=True)
+    created_at     = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    task = relationship("Task", back_populates="comments")
 
 class Label(Base):
     __tablename__ = "labels"

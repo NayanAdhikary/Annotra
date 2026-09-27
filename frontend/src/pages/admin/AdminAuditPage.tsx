@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { adminApi, AuditEntry } from '../../api/admin';
+import { adminApi, type AuditEntry } from '../../api/admin';
 import { useAuthStore } from '../../store/authStore';
 
 const ACTION_COLOR = (action: string) => {

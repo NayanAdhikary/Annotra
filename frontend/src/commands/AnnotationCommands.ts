@@ -5,7 +5,8 @@ import type { Annotation } from '../types/annotation';
 
 export class AddAnnotationCommand implements Command {
   label = 'Add annotation';
-  constructor(private readonly ann: Annotation) {}
+  private readonly ann: Annotation;
+  constructor(ann: Annotation) { this.ann = ann; }
 
   apply(ctx: CommandContext): void {
     ctx.addLocal(this.ann);
@@ -21,7 +22,8 @@ export class AddAnnotationCommand implements Command {
 
 export class DeleteAnnotationCommand implements Command {
   label = 'Delete annotation';
-  constructor(private readonly ann: Annotation) {}
+  private readonly ann: Annotation;
+  constructor(ann: Annotation) { this.ann = ann; }
 
   apply(ctx: CommandContext): void {
     ctx.removeLocal(this.ann.id);
@@ -36,7 +38,8 @@ export class DeleteAnnotationCommand implements Command {
 
 export class DeleteManyCommand implements Command {
   label = 'Delete annotations';
-  constructor(private readonly anns: Annotation[]) {}
+  private readonly anns: Annotation[];
+  constructor(anns: Annotation[]) { this.anns = anns; }
 
   apply(ctx: CommandContext): void {
     for (const a of this.anns) ctx.removeLocal(a.id);
@@ -49,7 +52,8 @@ export class DeleteManyCommand implements Command {
 
 export class AddManyCommand implements Command {
   label = 'Restore annotations';
-  constructor(private readonly anns: Annotation[]) {}
+  private readonly anns: Annotation[];
+  constructor(anns: Annotation[]) { this.anns = anns; }
 
   apply(ctx: CommandContext): void {
     for (const a of this.anns) ctx.addLocal(a);
@@ -64,11 +68,14 @@ export class AddManyCommand implements Command {
 
 export class ChangeLabelCommand implements Command {
   label = 'Change label';
-  constructor(
-    private readonly ids: string[],
-    private readonly fromLabelId: number,
-    private readonly toLabelId: number,
-  ) {}
+  private readonly ids: string[];
+  private readonly fromLabelId: number;
+  private readonly toLabelId: number;
+  constructor(ids: string[], fromLabelId: number, toLabelId: number) {
+    this.ids = ids;
+    this.fromLabelId = fromLabelId;
+    this.toLabelId = toLabelId;
+  }
 
   apply(ctx: CommandContext): void {
     ctx.replaceMany(this.ids, { labelId: this.toLabelId });
@@ -88,13 +95,10 @@ export class ChangeLabelCommand implements Command {
  */
 export class ReplacePointsCommand implements Command {
   label = 'Move annotation';
-  constructor(
-    private readonly changes: Array<{
-      id: string;
-      from: number[];
-      to: number[];
-    }>,
-  ) {}
+  private readonly changes: Array<{ id: string; from: number[]; to: number[]; }>;
+  constructor(changes: Array<{ id: string; from: number[]; to: number[]; }>) {
+    this.changes = changes;
+  }
 
   apply(ctx: CommandContext): void {
     for (const c of this.changes) ctx.replaceAnnotation(c.id, { points: c.to });
@@ -132,10 +136,12 @@ export class ReplacePointsCommand implements Command {
 
 export class ToggleOccludedCommand implements Command {
   label = 'Toggle occluded';
-  constructor(
-    private readonly ids: string[],
-    private readonly toValue: boolean,
-  ) {}
+  private readonly ids: string[];
+  private readonly toValue: boolean;
+  constructor(ids: string[], toValue: boolean) {
+    this.ids = ids;
+    this.toValue = toValue;
+  }
 
   apply(ctx: CommandContext): void {
     ctx.replaceMany(this.ids, { occluded: this.toValue });

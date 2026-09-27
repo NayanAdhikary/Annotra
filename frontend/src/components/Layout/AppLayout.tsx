@@ -29,6 +29,14 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
           >
             Projects
           </Link>
+          <Link
+            to="/my-tasks"
+            className={`hover:text-slate-900 ${
+              loc.pathname === '/my-tasks' ? 'text-slate-900 font-medium' : 'text-slate-500'
+            }`}
+          >
+            My tasks
+          </Link>
         </nav>
         <div className="ml-auto">
           <UserMenu />

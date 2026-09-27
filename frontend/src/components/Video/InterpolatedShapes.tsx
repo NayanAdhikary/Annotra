@@ -48,10 +48,7 @@ export const InterpolatedShapes: React.FC<Props> = ({ width, height }) => {
           );
         }
         if (a.shapeType === 'polygon' || a.shapeType === 'polyline') {
-          const pts: string = [];
-          for (let i = 0; i < a.points.length; i += 2) {
-            (pts as any).push?.(`${a.points[i]},${a.points[i + 1]}`);
-          }
+
           const pointsStr = Array.from({ length: a.points.length / 2 })
             .map((_, i) => `${a.points[i * 2]},${a.points[i * 2 + 1]}`)
             .join(' ');

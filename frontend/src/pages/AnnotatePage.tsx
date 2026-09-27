@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Toolbar } from '../components/Toolbar/Toolbar';
 import { HistoryControls } from '../components/Toolbar/HistoryControls';
-import { AnnotationCanvas } from '../components/Canvas/AnnotationCanvas';
-import { AnnotationList } from '../components/Sidebar/AnnotationList';
+import { AnnotationCanvas } from '../components/canvas/AnnotationCanvas';
+import { WorkspaceSidebar } from '../components/Sidebar/WorkspaceSidebar';
 import { SaveIndicator } from '../components/Status/SaveIndicator';
 import { ConflictBanner } from '../components/Status/ConflictBanner';
 import { LabelManager } from '../components/LabelManager/LabelManager';
@@ -15,11 +15,12 @@ import { taskApi, type Task } from '../api/project';
 import { useAutosaveQueue } from '../hooks/useAutosaveQueue';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import { useBulkActions } from '../hooks/useBulkActions';
-import { RectInspector } from '../components/Inspector/RectInspector';
+
 import { UserMenu } from '../components/Layout/UserMenu';
 import type { Annotation } from '../types/annotation';
 import { useHistoryKeys } from '../hooks/useHistoryKeys';
 import { useHistoryStore } from '../store/historyStore';
+import { tasksApi } from '../api/tasks';
 
 export const AnnotatePage: React.FC = () => {
   const { taskId } = useParams<{ taskId: string }>();
@@ -32,6 +33,11 @@ export const AnnotatePage: React.FC = () => {
   const [images, setImages] = useState<ImageAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLabelManager, setShowLabelManager] = useState(false);
+  const [taskStatus, setTaskStatus] = useState<string>('');
+
+  useEffect(() => {
+    tasksApi.get(id).then((t) => setTaskStatus(t.status));
+  }, [id]);
 
   const saveStatus = useAnnotationStore((s) => s.saveStatus);
   
@@ -170,6 +176,23 @@ export const AnnotatePage: React.FC = () => {
           <HistoryControls />
           <SaveIndicator />
           <div className="h-6 w-px bg-slate-200"></div>
+          {taskStatus === 'annotation' && (
+            <button
+              onClick={async () => {
+                if (!window.confirm('Submit this task for review?')) return;
+                await tasksApi.transition(id, 'review');
+                setTaskStatus('review');
+              }}
+              className="text-xs px-3 py-1.5 bg-amber-600 text-white rounded hover:bg-amber-700"
+            >
+              Submit for review
+            </button>
+          )}
+          {taskStatus === 'review' && (
+            <span className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded">
+              In review
+            </span>
+          )}
           <UserMenu />
         </div>
       </header>
@@ -201,11 +224,7 @@ export const AnnotatePage: React.FC = () => {
         </div>
         
         {/* Sidebar */}
-        <aside className="w-80 border-l border-slate-200 bg-white flex flex-col overflow-hidden shrink-0 shadow-sm z-10">
-          <RectInspector />
-          <div className="h-px bg-slate-200 shrink-0"></div>
-          <AnnotationList />
-        </aside>
+        <WorkspaceSidebar taskId={id} />
       </div>
 
       {/* Footer nav with Prev/Next and frame / total counter */}

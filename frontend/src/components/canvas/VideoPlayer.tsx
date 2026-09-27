@@ -10,6 +10,7 @@ export const VideoPlayer: React.FC<{ taskId: number }> = ({ taskId }) => {
   return (
     <div className="flex flex-col items-center">
       <AnnotationCanvas
+        taskId={taskId}
         imageUrl={frames[currentFrame]}
         width={1280}
         height={720}
