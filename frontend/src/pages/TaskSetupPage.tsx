@@ -9,6 +9,8 @@ import { labelsApi } from '../api/labels';
 import { api } from '../api/client';
 import { useAnnotationStore } from '../store/annotationStore';
 import type { Label } from '../types/annotation';
+import { ExportDrawer } from '../components/Export/ExportDrawer';
+import { ImportDrawer } from '../components/Export/ImportDrawer';
 
 export const TaskSetupPage: React.FC = () => {
     const { taskId } = useParams<{ taskId: string }>();
@@ -19,6 +21,8 @@ export const TaskSetupPage: React.FC = () => {
     const [images, setImages] = useState<ImageAsset[]>([]);
     const [labels, setLabels] = useState<Label[]>([]);
     const [isLabelManagerOpen, setIsLabelManagerOpen] = useState(false);
+    const [showExport, setShowExport] = useState(false);
+    const [showImport, setShowImport] = useState(false);
     
     const setTask_ = useAnnotationStore(s => s.setTask);
     const setLabels_ = useAnnotationStore(s => s.setLabels);
@@ -78,20 +82,32 @@ export const TaskSetupPage: React.FC = () => {
                     </Link>
                     <h1 className="text-2xl font-bold text-slate-900">Task Setup: {task?.name || '...'}</h1>
                 </div>
-                <button
-                    disabled={!canAnnotate}
-                    onClick={() => {
-                        if (task?.task_type === 'video') {
-                            const firstReady = videos.find(v => v.extraction_status === 'done');
-                            if (firstReady) navigate(`/tasks/${id}/videos/${firstReady.id}`);
-                        } else {
-                            navigate(`/tasks/${id}`);
-                        }
-                    }}
-                    className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                    Start annotating →
-                </button>
+                <div className="flex items-center gap-4">
+                    <div className="flex gap-2">
+                        <button onClick={() => setShowImport(true)}
+                                className="px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50">
+                            Import dataset
+                        </button>
+                        <button onClick={() => setShowExport(true)}
+                                className="px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50">
+                            Export
+                        </button>
+                    </div>
+                    <button
+                        disabled={!canAnnotate}
+                        onClick={() => {
+                            if (task?.task_type === 'video') {
+                                const firstReady = videos.find(v => v.extraction_status === 'done');
+                                if (firstReady) navigate(`/tasks/${id}/videos/${firstReady.id}`);
+                            } else {
+                                navigate(`/tasks/${id}`);
+                            }
+                        }}
+                        className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        Start annotating →
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -210,6 +226,18 @@ export const TaskSetupPage: React.FC = () => {
                         <LabelManager onClose={() => { setIsLabelManagerOpen(false); loadData(); }} />
                     </div>
                 </div>
+            )}
+
+            {showExport && <ExportDrawer taskId={id} onClose={() => setShowExport(false)} />}
+            {showImport && (
+              <ImportDrawer
+                taskId={id}
+                onClose={() => setShowImport(false)}
+                onDone={() => {
+                  // Refresh image list
+                  imagesApi.list(id).then(setImages);
+                }}
+              />
             )}
         </div>
     );

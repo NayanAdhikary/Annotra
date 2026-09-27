@@ -19,3 +19,10 @@ celery_app.conf.update(
     task_always_eager=True,
     task_eager_propagates=True,
 )
+
+celery_app.conf.beat_schedule = {
+    "cleanup-expired-exports": {
+        "task": "cleanup.expired_exports",
+        "schedule": 3600.0,  # hourly
+    },
+}

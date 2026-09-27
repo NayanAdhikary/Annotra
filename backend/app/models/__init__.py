@@ -7,6 +7,7 @@ from app.models.system_config import SystemConfig
 from app.models.api_key import ApiKey
 from app.models.admin_notification import AdminNotification
 from app.models.task_assignment import TaskAssignment
+from app.models.export_job import ExportJob, ImportJob
 
 __all__ = [
     "User",
@@ -21,5 +22,7 @@ __all__ = [
     "SystemConfig",
     "ApiKey",
     "AdminNotification",
-    "TaskAssignment"
+    "TaskAssignment",
+    "ExportJob",
+    "ImportJob"
 ]
