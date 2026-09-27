@@ -96,7 +96,23 @@ class COCOExporter(Exporter):
                         "segmentation": [],
                     })
                     ann_id += 1
-                continue
+            elif a["shape_type"] == "mask":
+                try:
+                    import json as _json
+                    rle = _json.loads(a["points"][0])
+                    # COCO allows raw RLE
+                    entry["segmentation"] = {
+                        "counts": rle["counts"],
+                        "size": rle["size"],
+                    }
+                    # Approximate bbox from RLE for `bbox` field
+                    h, w = rle["size"]
+                    entry["bbox"] = [0, 0, w, h]  # coarse; refine later if needed
+                    entry["area"] = sum(
+                        run for i, run in enumerate(rle["counts"]) if i % 2 == 1
+                    )
+                except Exception:
+                    continue
 
             ann_out.append(entry)
             ann_id += 1

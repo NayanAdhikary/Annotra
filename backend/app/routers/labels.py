@@ -54,7 +54,12 @@ async def create_label(task_id: int, payload: LabelCreate,
     if dup.scalar_one_or_none():
         raise HTTPException(status.HTTP_409_CONFLICT, "Label name already exists in this task")
 
-    label = Label(task_id=task_id, name=payload.name, color=payload.color)
+    label = Label(
+        task_id=task_id, 
+        name=payload.name, 
+        color=payload.color,
+        attributes=payload.model_dump()["attributes"]
+    )
     db.add(label)
     await db.flush()
     await audit(db, user=user, action="label.create",

@@ -14,6 +14,13 @@ from app.schemas.annotation import (
     BulkAnnotationCreate, CVATAnnotationExport, CVATExportShape,
     BulkAnnotationPatch
 )
+from app.services.attribute_validation import validate_annotation_attributes
+
+async def _validate_attrs(db: AsyncSession, label_id: int, attrs: list):
+    label = await db.get(Label, label_id)
+    if label is None:
+        return []
+    return validate_annotation_attributes(label.attributes or [], attrs)
 
 router = APIRouter()
 
@@ -53,6 +60,7 @@ async def create_annotation(
 ):
     await _assert_can_edit_task(db, task_id, user)
     await _ensure_label_exists(db, payload.label_id, task_id)
+    normalized = await _validate_attrs(db, payload.label_id, payload.attributes)
     ann = Annotation(
         task_id=task_id,
         image_id=getattr(payload, "image_id", None),
@@ -60,7 +68,7 @@ async def create_annotation(
         shape_type=payload.shape_type.value,
         points=payload.points,
         frame=payload.frame,
-        attributes=payload.attributes,
+        attributes=normalized,
         occluded=payload.occluded,
         group_id=payload.group_id,
         created_by=user.id,
@@ -82,13 +90,14 @@ async def bulk_create(task_id: int, payload: BulkAnnotationCreate,
     created = []
     for item in payload.annotations:
         await _ensure_label_exists(db, item.label_id, task_id)
+        normalized = await _validate_attrs(db, item.label_id, item.attributes)
         ann = Annotation(
             task_id=task_id,
             label_id=item.label_id,
             shape_type=item.shape_type.value,
             points=item.points,
             frame=item.frame,
-            attributes=item.attributes,
+            attributes=normalized,
             occluded=item.occluded,
             group_id=item.group_id,
             created_by=user.id,
@@ -136,13 +145,20 @@ async def update_annotation(ann_id: int, payload: AnnotationUpdate,
     if "points" in data and data["points"] is not None:
         from app.schemas.annotation import MIN_COORDS, ShapeType
         st = ShapeType(ann.shape_type)
-        if len(data["points"]) < MIN_COORDS[st]:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY,
-                f"{st.value} requires >= {MIN_COORDS[st]} coords"
-            )
-        if len(data["points"]) % 2:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "odd coord count")
+        if st != ShapeType.MASK:
+            if len(data["points"]) < MIN_COORDS[st]:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    f"{st.value} requires >= {MIN_COORDS[st]} coords"
+                )
+            if len(data["points"]) % 2:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "odd coord count")
+
+    if "attributes" in data or "label_id" in data:
+        target_label_id = data.get("label_id", ann.label_id)
+        target_attrs = data.get("attributes", ann.attributes)
+        normalized = await _validate_attrs(db, target_label_id, target_attrs)
+        data["attributes"] = normalized
 
     for k, v in data.items():
         setattr(ann, k, v)
@@ -209,11 +225,12 @@ async def bulk_patch(
         from app.schemas.annotation import MIN_COORDS, ShapeType
         for a in anns:
             st = ShapeType(a.shape_type)
-            if len(data["points"]) < MIN_COORDS[st]:
-                raise HTTPException(
-                    status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    f"annotation {a.id} ({st.value}) needs >= {MIN_COORDS[st]} coords"
-                )
+            if st != ShapeType.MASK:
+                if len(data["points"]) < MIN_COORDS[st]:
+                    raise HTTPException(
+                        status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        f"annotation {a.id} ({st.value}) needs >= {MIN_COORDS[st]} coords"
+                    )
 
     for a in anns:
         for k, v in data.items():

@@ -12,6 +12,7 @@ interface State {
   /** The "primary" selection — used for inspector panels, keyboard ops, etc. */
   primaryId: string | null;
   currentTool: ToolType;
+  brushSize: number;
   saveStatus: 'idle' | 'saving' | 'saved' | 'error';
 
   // Task / lifecycle
@@ -30,6 +31,7 @@ interface State {
 
   // Tools & selection
   setTool: (t: ToolType) => void;
+  setBrushSize: (size: number) => void;
   setActiveLabel: (id: number) => void;
   selectOne: (id: string | null) => void;
   toggleSelect: (id: string) => void;
@@ -63,6 +65,7 @@ export const useAnnotationStore = create<State>((set, get) => ({
   selectedIds: [],
   primaryId: null,
   currentTool: 'select',
+  brushSize: 30,
   saveStatus: 'idle',
   conflicts: {},
   saveErrors: {},
@@ -100,6 +103,7 @@ export const useAnnotationStore = create<State>((set, get) => ({
   setSaveStatus: (s) => set({ saveStatus: s }),
 
   setTool: (t) => set({ currentTool: t, selectedIds: [], primaryId: null }),
+  setBrushSize: (size) => set({ brushSize: size }),
   setActiveLabel: (id) => set({ activeLabelId: id }),
   // ---------- Selection ----------
   selectOne: (id) =>

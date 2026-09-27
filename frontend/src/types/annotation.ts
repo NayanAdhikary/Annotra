@@ -1,6 +1,8 @@
-export type ShapeType = 'rectangle' | 'polygon' | 'polyline' | 'points';
+import type { AttributeDef } from '../components/LabelManager/AttributeEditor';
 
-export type ToolType = 'select' | ShapeType;
+export type ShapeType = 'rectangle' | 'polygon' | 'polyline' | 'points' | 'mask';
+
+export type ToolType = 'select' | ShapeType | 'brush' | 'eraser';
 
 export interface Annotation {
   id: string;
@@ -23,6 +25,7 @@ export interface Label {
   id: number;
   name: string;
   color: string;
+  attributes?: AttributeDef[];
 }
 
 /** Vertex index helpers — never index points[] directly outside these. */

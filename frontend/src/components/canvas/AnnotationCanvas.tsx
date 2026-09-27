@@ -9,6 +9,8 @@ import { useMarquee } from '../../hooks/useMarquee';
 import { usePan } from '../../hooks/usePan';
 import { useZoom } from '../../hooks/useZoom';
 import { useFitToScreen } from '../../hooks/useFitToScreen';
+import { BrushOverlay } from '../../commands/BrushOverlay';
+import { useBrush } from '../../hooks/useBrush';
 import { ShapeRenderer } from './ShapeRenderer';
 import { DraftShape } from './DraftShape';
 import { SelectionTransformer } from './SelectionTransformer';
@@ -59,6 +61,14 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
     loadTask(taskId);
     return () => commitTask(taskId);
   }, [taskId, loadTask, commitTask]);
+
+  const brush = useBrush(width, height, activeLabelId);
+
+  useEffect(() => {
+    if (currentTool === 'brush') brush.setMode('brush');
+    else if (currentTool === 'eraser') brush.setMode('eraser');
+    else if (brush.isDirty()) brush.endPaint();
+  }, [currentTool, brush]);
 
   useEffect(() => {
     if (img) setImageSize(width, height);
@@ -129,22 +139,34 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
     if (pan.onMouseDown(e)) return;
     const onStage = e.target === e.target.getStage();
     const [x, y] = relativePointer();
+    if (currentTool === 'brush' || currentTool === 'eraser') {
+      brush.startPaint(x, y);
+      return;
+    }
     if (currentTool === 'select') {
       if (onStage) marquee.begin(x, y, (e.evt as MouseEvent).shiftKey);
       return;
     }
     if (currentTool === 'rectangle') drawing.beginAt('rectangle', x, y);
-  }, [pan, currentTool, marquee, drawing, relativePointer]);
+  }, [pan, currentTool, marquee, drawing, relativePointer, brush]);
 
   const onMouseMove = useCallback(() => {
     if (pan.onMouseMove()) return;
     const [x, y] = relativePointer();
+    if (currentTool === 'brush' || currentTool === 'eraser') {
+      brush.movePaint(x, y);
+      return;
+    }
     if (currentTool === 'select') marquee.move(x, y);
     drawing.moveTo(x, y);
-  }, [pan, currentTool, marquee, drawing, relativePointer]);
+  }, [pan, currentTool, marquee, drawing, relativePointer, brush]);
 
   const onMouseUp = useCallback(() => {
     if (pan.onMouseUp()) return;
+    if (currentTool === 'brush' || currentTool === 'eraser') {
+      brush.endPaint();
+      return;
+    }
     if (currentTool === 'select') { marquee.end(false); return; }
     if (currentTool === 'rectangle' && drawing.draft.kind === 'rectangle') {
       const [x1, y1] = drawing.draft.start;
@@ -154,7 +176,7 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
       }
       drawing.cancel();
     }
-  }, [pan, currentTool, drawing, marquee, commitShape]);
+  }, [pan, currentTool, drawing, marquee, commitShape, brush]);
 
   const onClick = useCallback((e: any) => {
     if (pan.isPanning()) return;
@@ -271,12 +293,33 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
         </Layer>
       </Stage>
 
+      {/* Brush overlay must be placed outside the Stage to leverage HTML composite,
+          scaled and translated to match the canvas viewport. */}
+      {['brush', 'eraser'].includes(currentTool) && (
+        <div 
+          className="absolute top-0 left-0 pointer-events-none"
+          style={{
+            width, height,
+            transform: `translate(${live.x}px, ${live.y}px) scale(${s})`,
+            transformOrigin: '0 0',
+          }}
+        >
+          <BrushOverlay
+            width={width}
+            height={height}
+            mask={brush.getMask()}
+            version={brush.version}
+            color={labels.find((l) => l.id === activeLabelId)?.color ?? '#FF0000'}
+          />
+        </div>
+      )}
+
       <div className="absolute bottom-3 right-3 z-10">
         <ZoomControls stageRef={stageRef} />
       </div>
 
       <div className="absolute bottom-3 left-3 z-10 text-[11px] text-slate-500 bg-white/80 backdrop-blur-sm px-2 py-1 rounded border border-slate-200 pointer-events-none">
-        Scroll = zoom · Space+drag or middle-drag = pan · 0 = fit · 1 = 100%
+        Scroll = zoom · Space+drag or middle-drag = pan · 0 = fit · 1 = 100% · Shift+F = zoom to selection
       </div>
     </div>
   );

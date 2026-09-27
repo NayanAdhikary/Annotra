@@ -21,6 +21,9 @@ import type { Annotation } from '../types/annotation';
 import { useHistoryKeys } from '../hooks/useHistoryKeys';
 import { useHistoryStore } from '../store/historyStore';
 import { tasksApi } from '../api/tasks';
+import { useCopyPaste } from '../hooks/useCopyPaste';
+import { useTabNavigation } from '../hooks/useTabNavigation';
+import { useZoomToSelection } from '../hooks/useZoomToSelection';
 
 export const AnnotatePage: React.FC = () => {
   const { taskId } = useParams<{ taskId: string }>();
@@ -45,6 +48,9 @@ export const AnnotatePage: React.FC = () => {
   useAutosaveQueue();
   useBulkActions(id);
   useHistoryKeys();
+  useCopyPaste();
+  useTabNavigation();
+  useZoomToSelection();
 
   useEffect(() => { useHistoryStore.getState().clear(); }, [id]);
 

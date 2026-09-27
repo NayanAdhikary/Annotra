@@ -4,6 +4,7 @@ import type { Annotation, Label } from '../../types/annotation';
 import { RectShape } from './Shapes/RectShape';
 import { PolyShape } from './Shapes/PolyShape';
 import { PointsShape } from './Shapes/PointsShape';
+import { MaskKonvaShape } from './Shapes/MaskKonvaShape';
 
 interface Props {
   annotation: Annotation;
@@ -19,5 +20,6 @@ export const ShapeRenderer: React.FC<Props> = (props) => {
     case 'polygon':
     case 'polyline':  return <PolyShape {...props} />;
     case 'points':    return <PointsShape {...props} />;
+    case 'mask':      return <MaskKonvaShape {...props} />;
   }
 };

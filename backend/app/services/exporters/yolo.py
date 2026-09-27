@@ -10,7 +10,9 @@ class YOLOExporter(Exporter):
     file_extension = ".txt"
 
     def write(self, output_dir: str, ctx: ExportContext) -> None:
-        pass
+        for a in ctx.annotations:
+            if a["shape_type"] == "mask":
+                continue
 
 
 register(YOLOExporter())

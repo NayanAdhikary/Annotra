@@ -1,5 +1,5 @@
 from fastapi import status
-from sqlalchemy import Column, Integer, BigInteger, String, ForeignKey, DateTime, func, Boolean, Text
+from sqlalchemy import Column, Integer, BigInteger, String, ForeignKey, DateTime, func, Boolean, Text, JSON
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -69,6 +69,7 @@ class Label(Base):
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
     name = Column(String(100), nullable=False)
     color = Column(String(7), default="#FF0000")
+    attributes = Column(JSON, default=list, nullable=False)
 
     task = relationship("Task", back_populates="labels")
 

@@ -8,14 +8,16 @@ const TOOLS: { key: ToolType; label: string; hotkey: string; icon: string }[] = 
   { key: 'polygon',   label: 'Polygon',   hotkey: 'P', icon: '⬡' },
   { key: 'polyline',  label: 'Polyline',  hotkey: 'L', icon: '∿' },
   { key: 'points',    label: 'Points',    hotkey: 'K', icon: '•' },
+  { key: 'brush',     label: 'Brush',     hotkey: 'B', icon: '🖌' },
+  { key: 'eraser',    label: 'Eraser',    hotkey: 'E', icon: '⌫' },
 ];
 
 const HOTKEY_TO_TOOL: Record<string, ToolType> = {
-  v: 'select', r: 'rectangle', p: 'polygon', l: 'polyline', k: 'points',
+  v: 'select', r: 'rectangle', p: 'polygon', l: 'polyline', k: 'points', b: 'brush', e: 'eraser',
 };
 
 export const Toolbar: React.FC<{ onManageLabels?: () => void }> = ({ onManageLabels }) => {
-  const { currentTool, setTool, labels, activeLabelId, setActiveLabel } =
+  const { currentTool, setTool, labels, activeLabelId, setActiveLabel, brushSize, setBrushSize } =
     useAnnotationStore();
 
   useEffect(() => {
@@ -47,6 +49,19 @@ export const Toolbar: React.FC<{ onManageLabels?: () => void }> = ({ onManageLab
           </button>
         ))}
       </div>
+
+      {['brush', 'eraser'].includes(currentTool) && (
+        <div className="flex items-center gap-2 border-l pl-3">
+          <span className="text-xs text-slate-500">Size</span>
+          <input
+            type="range" min={5} max={200}
+            value={brushSize}
+            onChange={(e) => setBrushSize(Number(e.target.value))}
+            className="w-32"
+          />
+          <span className="text-xs text-slate-700 tabular-nums w-8">{brushSize}px</span>
+        </div>
+      )}
 
       <div className="border-l pl-4 flex items-center gap-2">
         <span className="text-sm text-gray-600">Label:</span>

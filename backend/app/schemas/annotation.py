@@ -9,6 +9,7 @@ class ShapeType(str, Enum):
     POLYGON = "polygon"
     POLYLINE = "polyline"
     POINTS = "points"
+    MASK = "mask"
 
 
 # Minimum coordinate counts per shape type
@@ -17,13 +18,14 @@ MIN_COORDS = {
     ShapeType.POLYGON: 6,     # 3 vertices minimum
     ShapeType.POLYLINE: 4,    # 2 vertices minimum
     ShapeType.POINTS: 2,      # 1 keypoint minimum
+    ShapeType.MASK: 1,        # 1 RLE string
 }
 
 
 class AnnotationCreate(BaseModel):
     label_id: int
     shape_type: ShapeType
-    points: List[float]
+    points: List[Any]
     frame: int = 0
     occluded: bool = False
     attributes: List[Any] = Field(default_factory=list)
@@ -39,13 +41,15 @@ class AnnotationCreate(BaseModel):
             raise ValueError(
                 f"{st.value} requires at least {MIN_COORDS[st]} coordinates, got {len(v)}"
             )
+        if st == ShapeType.MASK:
+            return v
         if len(v) % 2 != 0:
             raise ValueError("points must contain an even number of values (x,y pairs)")
         return v
 
 
 class AnnotationUpdate(BaseModel):
-    points: Optional[List[float]] = None
+    points: Optional[List[Any]] = None
     label_id: Optional[int] = None
     frame: Optional[int] = None
     occluded: Optional[bool] = None
@@ -59,7 +63,7 @@ class AnnotationResponse(BaseModel):
     frame: int
     label_id: int
     shape_type: ShapeType
-    points: List[float]
+    points: List[Any]
     occluded: bool
     source: str
     group_id: int

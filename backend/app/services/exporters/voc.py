@@ -35,7 +35,7 @@ class VOCExporter(Exporter):
         labels = {l["id"]: l["name"] for l in ctx.labels}
         by_image: dict[int, list[dict]] = {}
         for a in ctx.annotations:
-            if a["shape_type"] == "points":
+            if a["shape_type"] in ("points", "mask"):
                 continue
             by_image.setdefault(a["image_id"], []).append(a)
 

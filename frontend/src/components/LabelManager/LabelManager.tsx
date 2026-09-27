@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAnnotationStore } from '../../store/annotationStore';
 import { labelsApi } from '../../api/labels';
 import { useSaveStatus } from '../../hooks/useSaveStatus';
+import { AttributeEditor, AttributeDef } from './AttributeEditor';
 
 const PALETTE = [
   '#FF3B30', '#FF9500', '#FFCC00', '#34C759',
@@ -14,6 +15,8 @@ export const LabelManager: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   const [color, setColor] = useState(PALETTE[0]);
   const [busy, setBusy] = useState(false);
   const wrap = useSaveStatus();
+  
+  const [editingAttributes, setEditingAttributes] = useState<number | null>(null);
 
   const handleCreate = async () => {
     if (!taskId || !name.trim()) return;
@@ -89,28 +92,60 @@ export const LabelManager: React.FC<{ onClose: () => void }> = ({ onClose }) => 
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {labels.map((l) => (
-            <div key={l.id} className="flex items-center gap-2 group">
-              <input
-                type="color"
-                value={l.color}
-                onChange={(e) => handleColorChange(l.id, e.target.value)}
-                className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent"
-              />
-              <input
-                defaultValue={l.name}
-                onBlur={(e) => {
-                  const v = e.target.value.trim();
-                  if (v && v !== l.name) handleNameChange(l.id, v);
-                }}
-                className="flex-1 border rounded px-2 py-1 text-sm"
-              />
-              <button
-                onClick={() => handleDelete(l.id)}
-                className="text-red-500 opacity-0 group-hover:opacity-100 transition"
-                title="Delete label"
-              >
-                🗑
-              </button>
+            <div key={l.id} className="border-b border-slate-100 last:border-0 pb-2 mb-2 last:mb-0 last:pb-0">
+              <div className="flex items-center gap-2 group">
+                <input
+                  type="color"
+                  value={l.color}
+                  onChange={(e) => handleColorChange(l.id, e.target.value)}
+                  className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent"
+                />
+                <input
+                  defaultValue={l.name}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v && v !== l.name) handleNameChange(l.id, v);
+                  }}
+                  className="flex-1 border rounded px-2 py-1 text-sm"
+                />
+                <button
+                  onClick={() => setEditingAttributes(editingAttributes === l.id ? null : l.id)}
+                  className="text-xs text-slate-500 hover:text-slate-900"
+                >
+                  Attrs ({l.attributes?.length ?? 0})
+                </button>
+                <button
+                  onClick={() => handleDelete(l.id)}
+                  className="text-red-500 opacity-0 group-hover:opacity-100 transition"
+                  title="Delete label"
+                >
+                  🗑
+                </button>
+              </div>
+              
+              {editingAttributes === l.id && (
+                <div className="mt-2 pl-9 pr-2">
+                  <AttributeEditor
+                    attributes={l.attributes ?? []}
+                    onChange={(attrs) => {
+                      // Optimistic local update
+                      upsertLabel({ ...l, attributes: attrs });
+                    }}
+                  />
+                  <button
+                    onClick={async () => {
+                      const updated = await wrap(() =>
+                        labelsApi.update(l.id, { attributes: l.attributes } as any)
+                      );
+                      upsertLabel(updated);
+                      setEditingAttributes(null);
+                    }}
+                    className="mt-2 text-xs text-indigo-600 hover:underline"
+                  >
+                    Save attributes
+                  </button>
+                </div>
+              )}
             </div>
           ))}
           {labels.length === 0 && (
