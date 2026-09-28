@@ -6,13 +6,13 @@ import { AnnotationCanvas } from '../components/canvas/AnnotationCanvas';
 import { WorkspaceSidebar } from '../components/Sidebar/WorkspaceSidebar';
 import { SaveIndicator } from '../components/Status/SaveIndicator';
 import { ConflictBanner } from '../components/Status/ConflictBanner';
-import { LabelManager } from '../components/LabelManager/LabelManager';
 import { useAnnotationStore } from '../store/annotationStore';
 import { labelsApi } from '../api/labels';
 import { imagesApi, type ImageAsset } from '../api/images';
 import { annotationsApi } from '../api/annotations';
 import { taskApi, type Task } from '../api/project';
 import { useAutosaveQueue } from '../hooks/useAutosaveQueue';
+import { reviewApi } from '../api/review';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import { useBulkActions } from '../hooks/useBulkActions';
 
@@ -29,18 +29,33 @@ export const AnnotatePage: React.FC = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const id = parseInt(taskId || '0', 10);
 
-  const { setTask, setLabels, setAnnotations, setFrame, frame, taskId: storeTaskId } =
+  const { setTask, setLabels, setAnnotations, setFrame, frame, taskId: storeTaskId, setTaskStatus } =
     useAnnotationStore();
     
   const [taskData, setTaskData] = useState<Task | null>(null);
   const [images, setImages] = useState<ImageAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLabelManager, setShowLabelManager] = useState(false);
-  const [taskStatus, setTaskStatus] = useState<string>('');
+  const [taskStatus, setTaskStatusLocal] = useState<string>('');
 
   useEffect(() => {
-    tasksApi.get(id).then((t) => setTaskStatus(t.status));
-  }, [id]);
+    tasksApi.get(id).then((t) => {
+      setTaskStatusLocal(t.status);
+      setTaskStatus(t.status);
+    });
+  }, [id, setTaskStatus]);
+  
+  const [rejectedCount, setRejectedCount] = useState(0);
+
+  const refreshRejected = async () => {
+    try {
+      const queue = await reviewApi.queue(id);
+      setRejectedCount(queue.stats.rejected);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  useEffect(() => { refreshRejected(); }, [id]);
 
   const saveStatus = useAnnotationStore((s) => s.saveStatus);
   
@@ -58,6 +73,8 @@ export const AnnotatePage: React.FC = () => {
     if (storeTaskId === id) return;
     setTask(id);
   }, [id, storeTaskId, setTask]);
+
+  const { labels } = useAnnotationStore.getState();
 
   useEffect(() => {
     let cancelled = false;
@@ -126,43 +143,40 @@ export const AnnotatePage: React.FC = () => {
 
   if (!images.length) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-slate-50 p-8 text-center">
-        <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mb-4 text-slate-400">
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        </div>
-        <h2 className="text-xl font-semibold text-slate-900 mb-2">This task has no images</h2>
-        <p className="text-slate-500 mb-6">You need to upload images before you can start annotating.</p>
-        <Link to={`/tasks/${id}/setup`} className="bg-indigo-600 text-white px-5 py-2.5 rounded-md hover:bg-indigo-700 font-medium transition-colors">
-          Go to Setup
+      <div className="h-screen flex flex-col items-center justify-center text-center px-6">
+        <div className="text-5xl mb-4">🖼</div>
+        <h2 className="text-xl font-semibold text-slate-900 mb-2">
+          This task has no images
+        </h2>
+        <p className="text-sm text-slate-500 mb-6">
+          Upload images to start annotating.
+        </p>
+        <Link
+          to={`/tasks/${id}/setup`}
+          className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
+        >
+          Upload images
         </Link>
       </div>
     );
   }
 
-  const { labels } = useAnnotationStore.getState();
-  if (!labels.length) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-slate-50 p-8 text-center">
-        <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mb-4 text-slate-400">
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-          </svg>
-        </div>
-        <h2 className="text-xl font-semibold text-slate-900 mb-2">No labels defined</h2>
-        <p className="text-slate-500 mb-6">Create at least one label to classify your annotations.</p>
-        <Link to={`/tasks/${id}/setup`} className="bg-indigo-600 text-white px-5 py-2.5 rounded-md hover:bg-indigo-700 font-medium transition-colors">
-          Go to Setup
-        </Link>
-      </div>
-    );
-  }
 
   const current = images[Math.min(frame, images.length - 1)];
 
   return (
     <div className="flex flex-col h-screen bg-slate-100">
+      {labels.length === 0 && (
+        <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-sm text-amber-900 flex items-center gap-3">
+          <span>⚠ This task has no labels yet. Add at least one before drawing.</span>
+          <Link
+            to={`/tasks/${id}/setup`}
+            className="ml-auto text-xs px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700"
+          >
+            Add label in Setup
+          </Link>
+        </div>
+      )}
       {/* Top bar with breadcrumb arrow, task name, annotated/total count, SaveIndicator, UserMenu */}
       <header className="flex items-center justify-between h-14 border-b border-slate-200 bg-white px-4 shrink-0 shadow-sm z-10">
         <div className="flex items-center gap-4">
@@ -177,7 +191,7 @@ export const AnnotatePage: React.FC = () => {
             </p>
           </div>
         </div>
-        <Toolbar onManageLabels={() => setShowLabelManager(true)} />
+        <Toolbar />
         <div className="flex items-center gap-5">
           <HistoryControls />
           <SaveIndicator />
@@ -199,27 +213,53 @@ export const AnnotatePage: React.FC = () => {
               In review
             </span>
           )}
+          <Link
+            to={`/tasks/${id}/setup`}
+            className="text-xs px-2 py-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-50"
+            title="Upload images, manage labels"
+          >
+            Setup
+          </Link>
           <UserMenu />
         </div>
       </header>
 
       <ConflictBanner />
 
+      {rejectedCount > 0 && taskStatus === 'annotation' && (
+        <div className="px-4 py-2 bg-red-50 border-b border-red-200 text-sm text-red-900 flex items-center gap-3">
+          <span>⚠ {rejectedCount} annotation{rejectedCount === 1 ? ' was' : 's were'} sent back by the reviewer.</span>
+          <button
+            onClick={async () => {
+              if (!confirm('Resubmit this task for review?')) return;
+              await tasksApi.transition(id, 'review');
+              setTaskStatusLocal('review');
+              useAnnotationStore.getState().setTaskStatus('review');
+            }}
+            className="ml-auto text-xs px-3 py-1 bg-slate-900 text-white rounded hover:bg-slate-800"
+          >
+            Resubmit for review
+          </button>
+        </div>
+      )}
+
       {/* Shortcuts bar */}
       <div className="px-4 py-1.5 text-[11px] text-slate-500 border-b border-slate-200 bg-slate-50 flex flex-wrap gap-x-6 gap-y-1 font-medium shrink-0">
-        <span><b className="text-slate-700">Shift+Click</b> multi-select</span>
-        <span><b className="text-slate-700">Drag</b> marquee</span>
-        <span><b className="text-slate-700">Alt+Click vertex</b> delete</span>
-        <span><b className="text-slate-700">Click edge dot</b> insert vertex</span>
-        <span><b className="text-slate-700">1–9</b> assign label to selection</span>
-        <span><b className="text-slate-700">O</b> toggle occluded</span>
+        <div><b>Draw:</b> R rect · P polygon · L line · K points · B brush · E eraser</div>
+        <div><b>Select:</b> V · Shift+click multi · Tab next · Shift+Tab prev</div>
+        <div><b>Edit:</b> Ctrl+Z undo · Ctrl+C/V copy/paste</div>
+        <div><b>View:</b> Scroll zoom · Space+drag pan · 0 fit · 1 100% · Shift+F zoom to selection</div>
+        <div><b>Review:</b> A accept · R reject · F fix · N next pending · Shift+A accept frame</div>
       </div>
 
       {/* Main Workspace */}
       <div className="flex flex-1 overflow-hidden">
         {/* Canvas Area */}
         <div className="flex-1 flex items-center justify-center bg-slate-100 overflow-auto p-8">
-          <div className="bg-white border border-slate-300 shadow-md rounded-sm overflow-hidden flex items-center justify-center">
+          <div
+            className="bg-white border border-slate-300 shadow-md rounded-sm overflow-hidden"
+            style={{ width: current.width, height: current.height }}
+          >
             <AnnotationCanvas
               taskId={id}
               imageUrl={current.url}
@@ -263,7 +303,6 @@ export const AnnotatePage: React.FC = () => {
         </button>
       </footer>
 
-      {showLabelManager && <LabelManager onClose={() => setShowLabelManager(false)} />}
     </div>
   );
 };

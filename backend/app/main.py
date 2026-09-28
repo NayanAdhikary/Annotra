@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import os
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, projects, tasks, annotations, labels, images, admin, announcements, videos, exports
+from app.routers import auth, projects, tasks, annotations, labels, images, admin, announcements, videos, exports, notifications
 
 app = FastAPI(title="Annotra API", version="0.1.0")
 
@@ -35,6 +35,7 @@ os.makedirs("/data/exports", exist_ok=True)
 os.makedirs("/data/imports", exist_ok=True)
 app.include_router(announcements.router, prefix="/api", tags=["announcements"])
 app.include_router(videos.router, prefix="/api", tags=["videos"])
+app.include_router(notifications.router, prefix="/api", tags=["notifications"])
 @app.get("/health")
 async def health():
     return {"status": "ok"}

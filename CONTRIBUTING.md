@@ -49,5 +49,30 @@ Two ways to implement undo:
 - The stack holds up to 100 entries; older entries are dropped.
 - Every mutation in the store MUST go through `useHistoryStore.execute()`.
   Direct calls to `addLocal`, `removeLocal`, `replaceMany` are only allowed
-  from inside `makeContext()` and during in-progress drags (which commit a
   single command on drag end).
+
+## Annotation Workflow
+
+Every task moves through four states. Only these transitions are allowed:
+
+  annotation ──► review ──► completed ──► archived
+       ▲           │
+       └───────────┘  (reviewer sends back)
+
+Role gates:
+- annotation → review     : annotator, manager, admin
+- review → completed      : reviewer, manager, admin
+- review → annotation     : reviewer, manager, admin
+- completed → archived    : manager, admin
+- archived → annotation   : manager, admin
+
+When a task is `completed`:
+- Annotations are locked (423 Locked on all writes)
+- The workspace shows a read-only banner
+- Tool buttons are disabled
+
+Notifications fire at these handoff points:
+- task_assigned             (admin assigns → user)
+- task_submitted_for_review (annotator submits → reviewers)
+- review_rejected           (reviewer rejects → annotator)
+- task_completed            (reviewer approves → all assignees)

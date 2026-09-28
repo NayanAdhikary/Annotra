@@ -58,6 +58,19 @@ export const UserMenu: React.FC = () => {
             </span>
           </div>
           <div style={{ padding: '0.5rem' }}>
+            {user.role === 'admin' && (
+              <button 
+                onClick={() => { setIsOpen(false); navigate('/admin'); }}
+                style={{
+                  width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.5rem 0.75rem',
+                  fontSize: '0.875rem', color: '#4f46e5', cursor: 'pointer', borderRadius: '4px', fontWeight: 500
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                Admin console
+              </button>
+            )}
             <button 
               onClick={() => { setIsOpen(false); navigate('/my-tasks'); }}
               style={{

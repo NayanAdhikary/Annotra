@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
 from passlib.context import CryptContext
+from passlib.handlers.bcrypt import bcrypt as passlib_bcrypt
 import secrets, hashlib
 from app.config import settings
 
@@ -12,6 +13,12 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    # Normalize the stored hash to fix incorrectly-padded bcrypt hashes
+    # (PasslibHashWarning / will be an error in Passlib 2.0)
+    try:
+        hashed = passlib_bcrypt.normhash(hashed)
+    except Exception:
+        pass
     return pwd_context.verify(plain, hashed)
 
 

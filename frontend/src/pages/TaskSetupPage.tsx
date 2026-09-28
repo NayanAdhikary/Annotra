@@ -164,7 +164,11 @@ export const TaskSetupPage: React.FC = () => {
                                     <h2 className="text-lg font-semibold text-slate-900">Images ({images.length})</h2>
                                 </div>
                                 {images.length === 0 ? (
-                                    <p className="text-slate-500 text-sm">No images uploaded yet.</p>
+                                    <div className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-slate-200 rounded-lg text-center bg-slate-50">
+                                        <div className="text-4xl mb-3 text-slate-300">🖼️</div>
+                                        <h3 className="text-base font-medium text-slate-900 mb-1">No images yet</h3>
+                                        <p className="text-slate-500 text-sm">Use the uploader above to add images.</p>
+                                    </div>
                                 ) : (
                                     <div className="grid grid-cols-4 gap-4 max-h-[500px] overflow-y-auto pr-2">
                                         {images.map(img => (
@@ -196,8 +200,10 @@ export const TaskSetupPage: React.FC = () => {
                         </div>
 
                         {labels.length === 0 ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-slate-200 rounded-lg">
-                                <p className="text-slate-500 mb-4 text-sm">You need at least one label to start annotating.</p>
+                            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-slate-200 rounded-lg bg-slate-50">
+                                <div className="text-4xl mb-3 text-slate-300">🏷️</div>
+                                <h3 className="text-base font-medium text-slate-900 mb-1">No labels defined</h3>
+                                <p className="text-slate-500 mb-4 text-sm px-4">You need at least one label to start annotating.</p>
                                 <button
                                     onClick={() => setIsLabelManagerOpen(true)}
                                     className="bg-slate-900 text-white px-4 py-2 rounded-md hover:bg-slate-800 font-medium text-sm transition-colors"

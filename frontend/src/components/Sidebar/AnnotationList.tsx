@@ -11,6 +11,7 @@ const ICON: Record<Annotation['shapeType'], string> = {
   polygon: '⬡',
   polyline: '∿',
   points: '•',
+  mask: '🖌',
 };
 
 export const AnnotationList: React.FC = () => {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAnnotationStore } from '../../store/annotationStore';
-import { tasksApi, Comment } from '../../api/tasks';
+import { tasksApi } from '../../api/tasks';
+import type { Comment } from '../../api/tasks';
 import { AnnotationList } from './AnnotationList';
 import { TaskComments } from '../Tasks/TaskComments';
 import { RectInspector } from '../Inspector/RectInspector';

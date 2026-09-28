@@ -57,7 +57,9 @@ export const AdminProjectsPage: React.FC = () => {
             {rows.map((p) => (
               <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50">
                 <td className="px-4 py-3">
-                  <div className="font-medium text-slate-900">{p.name}</div>
+                  <Link to={`/admin/projects/${p.id}`} className="font-medium text-slate-900 hover:text-indigo-600">
+                    {p.name}
+                  </Link>
                   {p.description && (
                     <div className="text-xs text-slate-500 truncate max-w-xs">{p.description}</div>
                   )}

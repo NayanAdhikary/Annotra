@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, distinct
 from typing import List
 from app.services.audit import audit
 from app.core.database import get_db
@@ -18,7 +18,7 @@ from app.services.task_workflow import transition_task
 router = APIRouter()
 
 
-async def _project_stats(db: AsyncSession, project_id: int) -> tuple[int, int]:
+async def _project_stats(db: AsyncSession, project_id: int) -> tuple[int, int, int, int, int]:
     task_count = (await db.execute(
         select(func.count()).select_from(Task).where(Task.project_id == project_id)
     )).scalar_one()
@@ -27,7 +27,18 @@ async def _project_stats(db: AsyncSession, project_id: int) -> tuple[int, int]:
         .join(Task, Task.id == ImageAsset.task_id)
         .where(Task.project_id == project_id)
     )).scalar_one()
-    return task_count, image_count
+
+    statuses = (await db.execute(
+        select(Task.status, func.count()).where(Task.project_id == project_id).group_by(Task.status)
+    )).all()
+    by_status = {s: c for s, c in statuses}
+
+    return (
+        task_count, image_count,
+        by_status.get("completed", 0),
+        by_status.get("review", 0),
+        by_status.get("annotation", 0),
+    )
 
 
 async def _assert_project_access(db: AsyncSession, project_id: int, user: User) -> Project:
@@ -48,18 +59,33 @@ async def list_projects(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    q = select(Project).order_by(Project.created_at.desc())
-    if user.role not in (UserRole.ADMIN.value, UserRole.MANAGER.value):
-        q = q.where(Project.owner_id == user.id)
+    if user.role in (UserRole.ADMIN.value, UserRole.MANAGER.value):
+        # Admins and managers see all projects
+        q = select(Project).order_by(Project.created_at.desc())
+    else:
+        # Regular users see projects where they have assigned tasks
+        assigned_project_ids_subq = (
+            select(distinct(Task.project_id))
+            .join(TaskAssignment, TaskAssignment.task_id == Task.id)
+            .where(TaskAssignment.user_id == user.id)
+        ).scalar_subquery()
+        q = (
+            select(Project)
+            .where(Project.id.in_(assigned_project_ids_subq))
+            .order_by(Project.created_at.desc())
+        )
 
     projects = (await db.execute(q)).scalars().all()
     out = []
     for p in projects:
-        tc, ic = await _project_stats(db, p.id)
+        tc, ic, cc, rc, ac = await _project_stats(db, p.id)
         out.append(ProjectResponse(
             id=p.id, name=p.name, description=p.description,
             owner_id=p.owner_id, task_count=tc, image_count=ic,
             created_at=p.created_at,
+            completed_task_count=cc,
+            in_review_task_count=rc,
+            annotation_task_count=ac,
         ))
     return out
 
@@ -98,11 +124,14 @@ async def get_project(
     user: User = Depends(get_current_user),
 ):
     project = await _assert_project_access(db, project_id, user)
-    tc, ic = await _project_stats(db, project_id)
+    tc, ic, cc, rc, ac = await _project_stats(db, project_id)
     return ProjectResponse(
         id=project.id, name=project.name, description=project.description,
         owner_id=project.owner_id, task_count=tc, image_count=ic,
         created_at=project.created_at,
+        completed_task_count=cc,
+        in_review_task_count=rc,
+        annotation_task_count=ac,
     )
 
 
@@ -171,6 +200,7 @@ async def _task_response(db: AsyncSession, t: Task) -> TaskResponse:
         assignees=assignees,
         archived_at=t.archived_at, completed_at=t.completed_at,
         created_at=t.created_at, updated_at=t.updated_at,
+        last_submitted_at=t.last_submitted_at, last_submitted_by=t.last_submitted_by,
     )
 
 
@@ -180,10 +210,23 @@ async def list_tasks(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    await _assert_project_access(db, project_id, user)
-    tasks = (await db.execute(
-        select(Task).where(Task.project_id == project_id).order_by(Task.created_at.desc())
-    )).scalars().all()
+    project = await db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(404, "Project not found")
+
+    if user.role in (UserRole.ADMIN.value, UserRole.MANAGER.value):
+        # Admins and managers see all tasks
+        tasks = (await db.execute(
+            select(Task).where(Task.project_id == project_id).order_by(Task.created_at.desc())
+        )).scalars().all()
+    else:
+        # Regular users only see tasks they are assigned to
+        tasks = (await db.execute(
+            select(Task)
+            .join(TaskAssignment, TaskAssignment.task_id == Task.id)
+            .where(Task.project_id == project_id, TaskAssignment.user_id == user.id)
+            .order_by(Task.created_at.desc())
+        )).scalars().all()
 
     out = []
     for t in tasks:
@@ -269,6 +312,38 @@ async def task_transition(
     old_status = t.status
     t = await transition_task(db, t, payload.to_status, user)
 
+    from datetime import datetime, timezone
+    if t.status == "review":
+        t.last_submitted_at = datetime.now(timezone.utc)
+        t.last_submitted_by = user.id
+
+    from app.services.notification import notify_task_assignees
+    # Notifications on status change
+    if old_status != t.status:
+        if t.status == "review":
+            await notify_task_assignees(
+                db, task=t, exclude_user_id=user.id,
+                kind="task_submitted_for_review",
+                title=f"'{t.name}' is ready for review",
+                body=f"Submitted by {user.full_name or user.username}",
+                role_filter="reviewer",
+            )
+        elif t.status == "annotation" and old_status == "review":
+            await notify_task_assignees(
+                db, task=t, exclude_user_id=user.id,
+                kind="review_rejected",
+                title=f"'{t.name}' was sent back",
+                body=f"Reopened by {user.full_name or user.username}",
+                role_filter="annotator",
+            )
+        elif t.status == "completed":
+            await notify_task_assignees(
+                db, task=t, exclude_user_id=user.id,
+                kind="task_completed",
+                title=f"'{t.name}' was approved",
+                body="The task is now complete.",
+            )
+
     await audit(db, user=user, action="task.transition",
                 resource_type="task", resource_id=t.id,
                 meta={"from": old_status, "to": t.status}, request=request)
@@ -313,6 +388,20 @@ async def create_comment(
     )
     db.add(c)
     await db.flush()
+
+    from app.services.notification import notify_task_assignees
+    link = f"/tasks/{task_id}"
+    if payload.annotation_id:
+        link += f"?annotation={payload.annotation_id}"
+    
+    await notify_task_assignees(
+        db, task=t, exclude_user_id=user.id,
+        kind="new_comment",
+        title=f"New comment on '{t.name}'",
+        body=payload.body,
+        link=link,
+    )
+
     await audit(db, user=user, action="task.comment_create",
                 resource_type="task", resource_id=task_id,
                 meta={"comment_id": c.id, "frame": payload.frame},
@@ -401,6 +490,12 @@ async def my_tasks(
             select(func.count()).select_from(TaskComment)
             .where(TaskComment.task_id == t.id, TaskComment.resolved.is_(False))
         )).scalar_one()
+
+        rejected_c = (await db.execute(
+            select(func.count()).select_from(Annotation)
+            .where(Annotation.task_id == t.id, Annotation.review_status == "rejected")
+        )).scalar_one()
+
         out.append(MyTaskRow(
             id=t.id, project_id=t.project_id,
             project_name=project.name if project else "",
@@ -410,9 +505,28 @@ async def my_tasks(
             image_count=ic, annotated_count=ac,
             open_comment_count=open_c,
             created_at=t.created_at,
+            rejected_annotation_count=rejected_c,
         ))
     return out
 
+
+@router.get("/tasks/{task_id}/review/queue")
+async def get_review_queue(
+    task_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    # check permissions
+    await _assert_can_read_task(db, task_id, user)
+    
+    rejected = (await db.execute(
+        select(func.count()).select_from(Annotation)
+        .where(Annotation.task_id == task_id, Annotation.review_status == "rejected")
+    )).scalar_one()
+
+    return {
+        "stats": {
+            "rejected": rejected
+        }
+    }
 
 @router.post("/tasks/{task_id}/duplicate", response_model=TaskResponse,
              status_code=201)

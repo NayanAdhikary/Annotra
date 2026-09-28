@@ -1,8 +1,10 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { UserMenu } from './UserMenu';
+import { NotificationBell } from './NotificationBell';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { ImpersonationBanner } from './ImpersonationBanner';
+import { useAuthStore } from '../../store/authStore';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const loc = useLocation();
@@ -37,8 +39,17 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
           >
             My tasks
           </Link>
+          {useAuthStore.getState().user?.role === 'admin' && (
+            <Link
+              to="/admin"
+              className="text-indigo-600 hover:text-indigo-700 font-medium ml-4"
+            >
+              Admin Console →
+            </Link>
+          )}
         </nav>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <NotificationBell />
           <UserMenu />
         </div>
       </header>

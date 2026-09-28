@@ -381,6 +381,8 @@ async def list_audit(
 
 # ---------------- Health ----------------
 
+import asyncio
+
 @router.get("/health", response_model=HealthReport)
 async def health(db: AsyncSession = Depends(get_db), _: User = ADMIN_ONLY):
     report = HealthReport(
@@ -389,25 +391,28 @@ async def health(db: AsyncSession = Depends(get_db), _: User = ADMIN_ONLY):
         versions={"api": "0.1.0"},
     )
 
+    # Database
     try:
-        await db.execute(select(1))
+        await asyncio.wait_for(db.execute(select(1)), timeout=1.0)
         report.database = True
     except Exception:
-        pass
+        report.database = False
 
+    # Redis + queue depth
     try:
         r = get_redis()
-        await r.ping()
+        await asyncio.wait_for(r.ping(), timeout=1.0)
         report.redis = True
-        # Celery uses Redis as broker; check for a known key
-        # (queue names depend on your Celery config)
         try:
-            report.pending_jobs = await r.llen("celery") + await r.llen("default")
+            report.pending_jobs = (
+                await asyncio.wait_for(r.llen("celery"), timeout=1.0)
+            )
         except Exception:
-            pass
+            report.pending_jobs = 0
     except Exception:
-        pass
+        report.redis = False
 
+    # Storage
     try:
         test_path = "/data/.healthcheck"
         os.makedirs("/data", exist_ok=True)
@@ -416,7 +421,16 @@ async def health(db: AsyncSession = Depends(get_db), _: User = ADMIN_ONLY):
         os.remove(test_path)
         report.storage_writable = True
     except Exception:
-        pass
+        report.storage_writable = False
+
+    # Celery worker count (best-effort via inspect; returns quickly or 0)
+    try:
+        from app.workers import celery_app
+        inspect = celery_app.control.inspect(timeout=1.0)
+        pong = await asyncio.to_thread(inspect.ping) or {}
+        report.celery_workers = len(pong)
+    except Exception:
+        report.celery_workers = 0
 
     return report
 
@@ -465,6 +479,41 @@ async def list_all_projects(
             annotation_count=ann_count, created_at=p.created_at,
         ))
     return out
+
+
+@router.get("/projects/{project_id}", response_model=AdminProjectRow)
+async def get_admin_project(
+    project_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = ADMIN_ONLY,
+):
+    p = await db.get(Project, project_id)
+    if p is None:
+        raise HTTPException(404, "Project not found")
+
+    owner = await db.get(User, p.owner_id)
+    task_count = (await db.execute(
+        select(func.count()).select_from(Task).where(Task.project_id == project_id)
+    )).scalar_one()
+    image_count = (await db.execute(
+        select(func.count()).select_from(ImageAsset)
+        .join(Task, Task.id == ImageAsset.task_id)
+        .where(Task.project_id == project_id)
+    )).scalar_one()
+    ann_count = (await db.execute(
+        select(func.count()).select_from(Annotation)
+        .join(Task, Task.id == Annotation.task_id)
+        .where(Task.project_id == project_id)
+    )).scalar_one()
+
+    return AdminProjectRow(
+        id=p.id, name=p.name, description=p.description,
+        owner_id=p.owner_id,
+        owner_email=owner.email if owner else None,
+        owner_name=(owner.full_name or owner.username) if owner else None,
+        task_count=task_count, image_count=image_count,
+        annotation_count=ann_count, created_at=p.created_at,
+    )
 
 
 @router.post("/projects/{project_id}/reassign", status_code=204)
@@ -574,6 +623,18 @@ async def assign_task(
     db.add(assignment)
     await db.flush()
 
+    from app.services.notification import notify
+    await notify(
+        db,
+        user_id=payload.user_id,
+        kind="task_assigned",
+        title=f"You've been assigned to {task.name}",
+        body=f"Role: {payload.role}",
+        link=f"/tasks/{task.id}",
+        resource_type="task",
+        resource_id=task.id,
+    )
+
     await audit(db, user=admin, action="task.assign",
                 resource_type="task", resource_id=task_id,
                 meta={"user_id": payload.user_id, "role": payload.role},
@@ -618,6 +679,14 @@ async def review_annotations(
     task_id: int, payload: ReviewAction, request: Request,
     db: AsyncSession = Depends(get_db), admin: User = ADMIN_ONLY,
 ):
+    task = await db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(404, "Task not found")
+    if task.status == "completed":
+        raise HTTPException(423, "This task is completed and locked for editing")
+    if task.status == "archived":
+        raise HTTPException(423, "This task is archived")
+
     status_map = {
         "accept": "accepted",
         "reject": "rejected",
@@ -644,6 +713,23 @@ async def review_annotations(
                 resource_type="task", resource_id=task_id,
                 meta={"count": len(anns), "annotation_ids": payload.annotation_ids[:20]},
                 request=request)
+    
+    if payload.action == "reject":
+        task = await db.get(Task, task_id)
+        from app.services.notification import notify
+        for ann in anns:
+            if ann.created_by and ann.created_by != admin.id:
+                await notify(
+                    db,
+                    user_id=ann.created_by,
+                    kind="review_rejected",
+                    title=f"Annotation rejected on '{task.name}'",
+                    body=payload.comment or "Reviewer rejected this annotation.",
+                    link=f"/tasks/{task.id}?annotation={ann.id}",
+                    resource_type="annotation",
+                    resource_id=ann.id,
+                )
+
     await db.commit()
     return {"updated": len(anns), "status": new_status}
 
@@ -1113,3 +1199,205 @@ async def quality_report(
         ))
 
     return QualityReport(since=since, until=until, rows=rows)
+
+from fastapi import UploadFile, File
+from typing import List
+import os, uuid, io
+from PIL import Image as PILImage
+
+
+ALLOWED_IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+UPLOAD_ROOT = "/data/images"
+
+
+@router.post("/tasks/{task_id}/images/bulk")
+async def bulk_upload_images(
+    task_id: int,
+    files: List[UploadFile] = File(...),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+    admin: User = ADMIN_ONLY,
+):
+    """
+    Upload N images into a task in a single request. Validates each with PIL,
+    stores under /data/images/{task_id}/, returns per-file results.
+    """
+    task = await db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(404, "Task not found")
+    if task.task_type != "image":
+        raise HTTPException(422, "This task is not an image task")
+
+    task_dir = os.path.join(UPLOAD_ROOT, str(task_id))
+    os.makedirs(task_dir, exist_ok=True)
+
+    created = []
+    skipped = []
+
+    for f in files:
+        ext = os.path.splitext(f.filename or "")[1].lower()
+        if ext not in ALLOWED_IMG_EXT:
+            skipped.append({"filename": f.filename, "reason": "unsupported extension"})
+            continue
+
+        raw = await f.read()
+        try:
+            img = PILImage.open(io.BytesIO(raw))
+            img.verify()
+            img = PILImage.open(io.BytesIO(raw))
+            w, h = img.width, img.height
+        except Exception:
+            skipped.append({"filename": f.filename, "reason": "invalid image"})
+            continue
+
+        safe = f"{uuid.uuid4().hex}{ext}"
+        abs_path = os.path.join(task_dir, safe)
+        with open(abs_path, "wb") as out:
+            out.write(raw)
+
+        asset = ImageAsset(
+            task_id=task_id,
+            filename=f.filename,
+            width=w, height=h,
+            storage_path=abs_path,
+        )
+        db.add(asset)
+        created.append(f.filename)
+
+    await audit(
+        db, user=admin, action="project.data_upload",
+        resource_type="task", resource_id=task_id,
+        meta={"created": len(created), "skipped": len(skipped)},
+        request=request,
+    )
+    await db.commit()
+
+    return {"created": created, "skipped": skipped, "total": len(files)}
+
+
+@router.post("/tasks/{task_id}/videos/bulk")
+async def bulk_upload_videos(
+    task_id: int,
+    files: List[UploadFile] = File(...),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+    admin: User = ADMIN_ONLY,
+):
+    task = await db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(404, "Task not found")
+    if task.task_type != "video":
+        raise HTTPException(422, "This task is not a video task")
+
+    from app.models.video import VideoAsset
+    from app.workers.video_worker import extract_video_frames
+
+    video_root = "/data/videos"
+    os.makedirs(os.path.join(video_root, str(task_id)), exist_ok=True)
+
+    created = []
+    for f in files:
+        ext = os.path.splitext(f.filename or "")[1].lower()
+        if ext not in {".mp4", ".mov", ".avi", ".mkv", ".webm"}:
+            continue
+
+        safe = f"{uuid.uuid4().hex}{ext}"
+        abs_path = os.path.join(video_root, str(task_id), safe)
+        with open(abs_path, "wb") as out:
+            while True:
+                chunk = await f.read(1024 * 1024)
+                if not chunk:
+                    break
+                out.write(chunk)
+
+        video = VideoAsset(
+            task_id=task_id,
+            filename=f.filename or safe,
+            storage_path=abs_path,
+            frames_dir="",  # set after flush
+            extraction_status="pending",
+        )
+        db.add(video)
+        await db.flush()
+        video.frames_dir = f"/data/frames/{video.id}"
+        os.makedirs(video.frames_dir, exist_ok=True)
+        created.append(video.id)
+
+    await db.commit()
+    for vid in created:
+        extract_video_frames.delay(vid)
+
+    return {"video_ids": created, "count": len(created)}
+
+
+from app.models.task_assignment import TaskAssignment
+from sqlalchemy import delete as sql_delete
+
+
+@router.post("/tasks/{task_id}/assign/bulk")
+async def bulk_assign(
+    task_id: int,
+    payload: dict,   # {"annotator_ids": [1,2], "reviewer_ids": [3]}
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = ADMIN_ONLY,
+):
+    """
+    Replace the entire assignment list for a task. Idempotent — pass the full
+    desired state; the endpoint reconciles add/remove.
+    """
+    task = await db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(404, "Task not found")
+
+    desired: list[tuple[int, str]] = []
+    for uid in payload.get("annotator_ids", []) or []:
+        desired.append((int(uid), "annotator"))
+    for uid in payload.get("reviewer_ids", []) or []:
+        desired.append((int(uid), "reviewer"))
+
+    # Validate users exist
+    for uid, _ in desired:
+        if await db.get(User, uid) is None:
+            raise HTTPException(404, f"User {uid} not found")
+
+    current = (await db.execute(
+        select(TaskAssignment).where(TaskAssignment.task_id == task_id)
+    )).scalars().all()
+    current_set = {(a.user_id, a.role) for a in current}
+    desired_set = set(desired)
+
+    # Remove entries not in the desired set
+    for a in current:
+        if (a.user_id, a.role) not in desired_set:
+            await db.delete(a)
+
+    # Add new entries
+    from app.services.notification import notify
+    for uid, role in desired:
+        if (uid, role) not in current_set:
+            db.add(TaskAssignment(
+                task_id=task_id, user_id=uid, role=role,
+                assigned_by=admin.id,
+            ))
+            await db.flush()
+            await notify(
+                db,
+                user_id=uid,
+                kind="task_assigned",
+                title=f"You've been assigned to {task.name}",
+                body=f"Role: {role}",
+                link=f"/tasks/{task.id}",
+                resource_type="task",
+                resource_id=task.id,
+            )
+
+    await audit(
+        db, user=admin, action="task.assign_bulk",
+        resource_type="task", resource_id=task_id,
+        meta={"annotators": payload.get("annotator_ids", []),
+              "reviewers": payload.get("reviewer_ids", [])},
+        request=request,
+    )
+    await db.commit()
+    return {"ok": True, "assigned": len(desired)}

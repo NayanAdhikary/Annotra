@@ -122,6 +122,7 @@ def run_import(self, job_id: int):
                     source="auto" if job.as_preannotations else "manual",
                     review_status="pending" if job.as_preannotations else "pending",
                     is_keyframe=True,
+                    created_by=job.user_id,
                 ))
                 imported += 1
 

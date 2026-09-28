@@ -28,6 +28,11 @@ async def _assert_can_edit_task(db: AsyncSession, task_id: int, user: User) -> T
     task = await db.get(Task, task_id)
     if task is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+    if task.status == "completed":
+        raise HTTPException(423, "This task is completed and locked for editing")
+    if task.status == "archived":
+        raise HTTPException(423, "This task is archived")
+    
     project = await db.get(Project, task.project_id)
     if project.owner_id != user.id and user.role not in (UserRole.ADMIN.value, UserRole.MANAGER.value):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not your project")

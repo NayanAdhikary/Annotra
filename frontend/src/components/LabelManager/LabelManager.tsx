@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAnnotationStore } from '../../store/annotationStore';
 import { labelsApi } from '../../api/labels';
 import { useSaveStatus } from '../../hooks/useSaveStatus';
-import { AttributeEditor, AttributeDef } from './AttributeEditor';
+import { AttributeEditor, type AttributeDef } from './AttributeEditor';
 
 const PALETTE = [
   '#FF3B30', '#FF9500', '#FFCC00', '#34C759',

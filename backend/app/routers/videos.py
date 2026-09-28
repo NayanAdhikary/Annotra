@@ -181,6 +181,7 @@ async def create_track(
         track_id=None,  # set below
         is_keyframe=True,
         outside=payload.outside,
+        created_by=user.id,
     )
     db.add(first)
     await db.flush()
@@ -244,6 +245,7 @@ async def add_keyframe(
             track_id=track_id,
             is_keyframe=True,
             outside=payload.outside,
+            created_by=user.id,
         ))
 
     await audit(db, user=user, action="track.keyframe_add",

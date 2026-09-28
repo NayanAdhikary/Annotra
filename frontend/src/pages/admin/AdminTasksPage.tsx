@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { adminApi } from '../../api/admin';
+import { api } from '../../api/client';
 
 interface Assignee { user_id: number; role: string; name: string; email: string }
 interface TaskRow {
@@ -20,19 +21,59 @@ const AssignModal: React.FC<{
   const [pickedUserId, setPickedUserId] = useState<number | null>(null);
   const [pickedRole, setPickedRole] = useState<'annotator' | 'reviewer'>('annotator');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Local mirror of the task's assignees, updated on every mutation.
+  const [assignees, setAssignees] = useState(task.assignees);
 
   useEffect(() => {
     adminApi.listUsers({ limit: 500 }).then(setUsers);
   }, []);
 
+  // If the parent refreshes and hands us a new task object, sync.
+  useEffect(() => {
+    setAssignees(task.assignees);
+  }, [task.assignees]);
+
+  const reloadTask = async () => {
+    // Pull fresh assignees from the admin task list endpoint, scoped to this task
+    try {
+      const res = await api.get('/api/admin/tasks', {
+        params: { project_id: task.project_id, limit: 500 },
+      });
+      const fresh = res.data.find((t: any) => t.id === task.id);
+      if (fresh) setAssignees(fresh.assignees);
+    } catch {
+      /* fall back to local optimistic state */
+    }
+  };
+
   const assign = async () => {
-    if (!pickedUserId) return;
+    if (!pickedUserId) {
+      setError('Pick a user first');
+      return;
+    }
     setBusy(true);
+    setError(null);
     try {
       await adminApi.assignTask(task.id, pickedUserId, pickedRole);
+      // Optimistic local update so the modal reflects it immediately
+      const u = users.find((x) => x.id === pickedUserId);
+      setAssignees((prev) => [
+        ...prev,
+        {
+          user_id: pickedUserId,
+          role: pickedRole,
+          name: u?.full_name || u?.username || `User ${pickedUserId}`,
+          email: u?.email || '',
+        },
+      ]);
+      setPickedUserId(null);
+      await reloadTask();
       onChanged();
     } catch (e: any) {
-      alert(e?.response?.data?.detail ?? 'Failed');
+      const detail = e?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Assign failed');
     } finally {
       setBusy(false);
     }
@@ -40,66 +81,139 @@ const AssignModal: React.FC<{
 
   const unassign = async (userId: number, role: string) => {
     setBusy(true);
-    try { await adminApi.unassignTask(task.id, userId, role); onChanged(); }
-    finally { setBusy(false); }
+    setError(null);
+    try {
+      await adminApi.unassignTask(task.id, userId, role);
+      setAssignees((prev) =>
+        prev.filter((a) => !(a.user_id === userId && a.role === role)),
+      );
+      await reloadTask();
+      onChanged();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail ?? 'Remove failed');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const eligible = users.filter(
-    (u) => u.is_active && (u.role === 'annotator' || u.role === 'manager' || u.role === 'reviewer' || u.role === 'admin'),
+    (u) =>
+      u.is_active &&
+      ['annotator', 'manager', 'reviewer', 'admin'].includes(u.role),
   );
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()}
-           className="bg-white rounded-lg w-full max-w-lg p-6 shadow-xl">
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg w-full max-w-lg p-6 shadow-xl"
+      >
         <h2 className="text-lg font-semibold mb-1">Assign task</h2>
-        <p className="text-sm text-slate-500 mb-4">{task.project_name} · {task.name}</p>
+        <p className="text-sm text-slate-500 mb-4">
+          {task.project_name} · {task.name}
+        </p>
+
+        {error && (
+          <div className="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded">
+            {error}
+          </div>
+        )}
 
         {/* Current assignees */}
         <div className="mb-4">
-          <div className="text-xs font-medium text-slate-500 mb-2">Current assignees</div>
-          {task.assignees.length === 0 && (
+          <div className="text-xs font-medium text-slate-500 mb-2">
+            Current assignees
+          </div>
+          {assignees.length === 0 ? (
             <div className="text-sm text-slate-400">No one assigned yet.</div>
+          ) : (
+            <ul className="divide-y divide-slate-100 border border-slate-200 rounded-md">
+              {assignees.map((a) => (
+                <li
+                  key={`${a.user_id}-${a.role}`}
+                  className="flex items-center gap-2 px-3 py-2"
+                >
+                  <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-[10px] flex items-center justify-center">
+                    {(a.name ?? '?').slice(0, 2).toUpperCase()}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-slate-900 truncate">
+                      {a.name}
+                    </div>
+                    <div className="text-xs text-slate-500 truncate">
+                      {a.email}
+                    </div>
+                  </div>
+                  <span
+                    className={`text-xs px-1.5 py-0.5 rounded capitalize ${
+                      a.role === 'reviewer'
+                        ? 'bg-sky-100 text-sky-700'
+                        : 'bg-emerald-100 text-emerald-700'
+                    }`}
+                  >
+                    {a.role}
+                  </span>
+                  <button
+                    onClick={() => unassign(a.user_id, a.role)}
+                    disabled={busy}
+                    className="text-xs text-red-600 hover:underline disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
-          {task.assignees.map((a) => (
-            <div key={`${a.user_id}-${a.role}`}
-                 className="flex items-center gap-2 py-1.5 border-b border-slate-100 last:border-0">
-              <span className="text-sm text-slate-900 flex-1">
-                {a.name} <span className="text-xs text-slate-500">({a.email})</span>
-              </span>
-              <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 capitalize">
-                {a.role}
-              </span>
-              <button onClick={() => unassign(a.user_id, a.role)} disabled={busy}
-                      className="text-xs text-red-600 hover:underline disabled:opacity-50">
-                Remove
-              </button>
-            </div>
-          ))}
         </div>
 
         {/* Add new */}
+        <div className="text-xs font-medium text-slate-500 mb-2">
+          Add a new assignee
+        </div>
         <div className="grid grid-cols-[1fr_140px_auto] gap-2">
-          <select value={pickedUserId ?? ''} onChange={(e) => setPickedUserId(Number(e.target.value))}
-                  className="border border-slate-300 rounded px-2 py-2 text-sm">
+          <select
+            value={pickedUserId ?? ''}
+            onChange={(e) =>
+              setPickedUserId(e.target.value ? Number(e.target.value) : null)
+            }
+            className="border border-slate-300 rounded px-2 py-2 text-sm"
+          >
             <option value="">Select a user…</option>
             {eligible.map((u) => (
-              <option key={u.id} value={u.id}>{u.full_name || u.username} ({u.email})</option>
+              <option key={u.id} value={u.id}>
+                {u.full_name || u.username} ({u.email})
+              </option>
             ))}
           </select>
-          <select value={pickedRole} onChange={(e) => setPickedRole(e.target.value as any)}
-                  className="border border-slate-300 rounded px-2 py-2 text-sm">
+          <select
+            value={pickedRole}
+            onChange={(e) =>
+              setPickedRole(e.target.value as 'annotator' | 'reviewer')
+            }
+            className="border border-slate-300 rounded px-2 py-2 text-sm"
+          >
             <option value="annotator">Annotator</option>
             <option value="reviewer">Reviewer</option>
           </select>
-          <button onClick={assign} disabled={!pickedUserId || busy}
-                  className="px-4 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 disabled:opacity-50">
-            Assign
+          <button
+            onClick={assign}
+            disabled={!pickedUserId || busy}
+            className="px-4 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {busy ? 'Working…' : 'Assign'}
           </button>
         </div>
 
-        <div className="flex justify-end mt-4">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600">Close</button>
+        <div className="flex justify-end mt-5 pt-4 border-t">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>

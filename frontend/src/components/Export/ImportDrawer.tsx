@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { exportsApi, DetectResult, ImportJob } from '../../api/exports';
+import { exportsApi } from '../../api/exports';
+import type { DetectResult, ImportJob } from '../../api/exports';
 import { labelsApi } from '../../api/labels';
 import type { Label } from '../../types/annotation';
 

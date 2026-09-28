@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { tasksApi, Comment } from '../../api/tasks';
+import { tasksApi } from '../../api/tasks';
+import type { Comment } from '../../api/tasks';
 import { useAuthStore } from '../../store/authStore';
 
 interface Props {

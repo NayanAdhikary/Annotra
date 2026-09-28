@@ -38,8 +38,10 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
 
   const {
     annotations, labels, selectedIds, currentTool, activeLabelId, frame,
-    attachServerId, selectOne, toggleSelect, setTool,
+    attachServerId, selectOne, toggleSelect, setTool, taskStatus
   } = useAnnotationStore();
+  
+  const readOnly = taskStatus === 'completed' || taskStatus === 'archived';
 
   const live = useViewportStore((s) => s.live);
   const containerW = useViewportStore((s) => s.containerW);
@@ -136,6 +138,7 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
   );
 
   const onMouseDown = useCallback((e: any) => {
+    if (readOnly) return;
     if (pan.onMouseDown(e)) return;
     const onStage = e.target === e.target.getStage();
     const [x, y] = relativePointer();
@@ -179,6 +182,7 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
   }, [pan, currentTool, drawing, marquee, commitShape, brush]);
 
   const onClick = useCallback((e: any) => {
+    if (readOnly) return;
     if (pan.isPanning()) return;
     if (currentTool === 'select') {
       if (e.target === e.target.getStage()) selectOne(null);
@@ -235,6 +239,11 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
 
   return (
     <div ref={containerRef} className="w-full h-full relative overflow-hidden" style={{ cursor: pan.cursor }}>
+      {readOnly && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-md shadow-sm border border-yellow-200 font-medium text-sm">
+          This task is {taskStatus}. Editing is disabled.
+        </div>
+      )}
       <Stage
         ref={stageRef}
         width={containerW}

@@ -16,12 +16,15 @@ const HOTKEY_TO_TOOL: Record<string, ToolType> = {
   v: 'select', r: 'rectangle', p: 'polygon', l: 'polyline', k: 'points', b: 'brush', e: 'eraser',
 };
 
-export const Toolbar: React.FC<{ onManageLabels?: () => void }> = ({ onManageLabels }) => {
-  const { currentTool, setTool, labels, activeLabelId, setActiveLabel, brushSize, setBrushSize } =
+export const Toolbar: React.FC = () => {
+  const { currentTool, setTool, labels, activeLabelId, setActiveLabel, brushSize, setBrushSize, taskStatus } =
     useAnnotationStore();
+    
+  const readOnly = taskStatus === 'completed' || taskStatus === 'archived';
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (readOnly) return;
       // Ignore when typing in an input
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
       const tool = HOTKEY_TO_TOOL[e.key.toLowerCase()];
@@ -29,7 +32,7 @@ export const Toolbar: React.FC<{ onManageLabels?: () => void }> = ({ onManageLab
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [setTool]);
+  }, [setTool, readOnly]);
 
   return (
     <div className="flex items-center gap-4 p-2 border-b bg-white">
@@ -38,8 +41,9 @@ export const Toolbar: React.FC<{ onManageLabels?: () => void }> = ({ onManageLab
           <button
             key={t.key}
             onClick={() => setTool(t.key)}
+            disabled={readOnly && t.key !== 'select'}
             title={`${t.label} (${t.hotkey})`}
-            className={`w-10 h-10 rounded flex items-center justify-center text-lg border ${
+            className={`w-10 h-10 rounded flex items-center justify-center text-lg border disabled:opacity-50 disabled:cursor-not-allowed ${
               currentTool === t.key
                 ? 'bg-blue-600 text-white border-blue-700'
                 : 'bg-white border-gray-300 hover:bg-gray-100'
@@ -84,13 +88,6 @@ export const Toolbar: React.FC<{ onManageLabels?: () => void }> = ({ onManageLab
           ))}
         </div>
       </div>
-
-      <button
-        onClick={onManageLabels}
-        className="ml-auto text-sm text-blue-600 hover:underline"
-      >
-        ⚙ Manage labels
-      </button>
     </div>
   );
 };

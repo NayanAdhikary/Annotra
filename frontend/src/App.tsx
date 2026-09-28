@@ -25,6 +25,7 @@ import { AdminTasksPage } from './pages/admin/AdminTasksPage';
 import { AdminApiKeysPage } from './pages/admin/AdminApiKeysPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage';
+import { AdminProjectDetailPage } from './pages/admin/AdminProjectDetailPage';
 
 export const App: React.FC = () => {
   const { accessToken, setUser } = useAuthStore();
@@ -78,6 +79,11 @@ export const App: React.FC = () => {
         <Route path="/admin/projects" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout><AdminProjectsPage /></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/projects/:projectId" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminLayout><AdminProjectDetailPage /></AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/admin/tasks" element={

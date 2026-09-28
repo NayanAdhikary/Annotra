@@ -53,6 +53,7 @@ export interface MyTaskRow {
   annotated_count: number;
   open_comment_count: number;
   created_at: string;
+  rejected_annotation_count: number;
 }
 
 export const tasksApi = {

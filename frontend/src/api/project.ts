@@ -7,6 +7,9 @@ export interface Project {
     owner_id: number;
     task_count: number;
     image_count: number;
+    completed_task_count: number;
+    in_review_task_count: number;
+    annotation_task_count: number;
     created_at: string;
 }
 
@@ -20,7 +23,9 @@ export interface Task {
     label_count: number;
     annotated_count: number;
     created_at: string;
+    assignees?: { user_id: number; role: string; name: string | null; email: string | null }[];
 }
+
 
 export const projectsAPI = {
     list: async (): Promise<Project[]> => {

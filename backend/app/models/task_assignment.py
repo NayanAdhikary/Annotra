@@ -4,7 +4,7 @@ from app.core.database import Base
 class TaskAssignment(Base):
     __tablename__ = "task_assignments"
 
-    id         = Column(BigInteger, primary_key=True)
+    id         = Column(BigInteger, primary_key=True, autoincrement=True)
     task_id    = Column(BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"),
                         nullable=False, index=True)
     user_id    = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"),

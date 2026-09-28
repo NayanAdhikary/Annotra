@@ -3,6 +3,7 @@ import type { Annotation, Label, ToolType } from '../types/annotation';
 
 interface State {
   taskId: number | null;
+  taskStatus: string | null;
   frame: number;
   annotations: Annotation[];
   labels: Label[];
@@ -17,6 +18,7 @@ interface State {
 
   // Task / lifecycle
   setTask: (taskId: number) => void;
+  setTaskStatus: (status: string) => void;
   setLabels: (labels: Label[]) => void;
   upsertLabel: (label: Label) => void;
   removeLabel: (labelId: number) => void;
@@ -58,6 +60,7 @@ const uid = () => `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}
 
 export const useAnnotationStore = create<State>((set, get) => ({
   taskId: null,
+  taskStatus: null,
   frame: 0,
   annotations: [],
   labels: [],
@@ -71,6 +74,7 @@ export const useAnnotationStore = create<State>((set, get) => ({
   saveErrors: {},
 
   setTask: (taskId) => set({ taskId, annotations: [], selectedIds: [], primaryId: null, frame: 0 }),
+  setTaskStatus: (status) => set({ taskStatus: status }),
 
   setLabels: (labels) =>
     set((s) => ({

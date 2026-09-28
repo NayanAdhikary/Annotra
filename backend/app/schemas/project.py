@@ -20,6 +20,9 @@ class ProjectResponse(BaseModel):
     task_count: int = 0
     image_count: int = 0
     created_at: datetime
+    completed_task_count: int = 0
+    in_review_task_count: int = 0
+    annotation_task_count: int = 0
 
     class Config:
         from_attributes = True
@@ -70,6 +73,8 @@ class TaskResponse(BaseModel):
     completed_at: Optional[datetime]
     created_at: datetime
     updated_at: Optional[datetime]
+    last_submitted_at: Optional[datetime] = None
+    last_submitted_by: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -127,6 +132,7 @@ class MyTaskRow(BaseModel):
     annotated_count: int
     open_comment_count: int
     created_at: datetime
+    rejected_annotation_count: int = 0
 
 
 class QualityRow(BaseModel):

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { exportsApi, ExportJob, ExportFormat } from '../../api/exports';
+import { exportsApi } from '../../api/exports';
+import type { ExportJob, ExportFormat } from '../../api/exports';
 import { useAuthStore } from '../../store/authStore';
 
 const FORMATS: { key: ExportFormat; label: string; hint: string }[] = [

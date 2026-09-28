@@ -10,6 +10,7 @@ from app.core.security import (
     hash_password, verify_password, create_access_token,
     generate_refresh_token, hash_refresh_token,
 )
+from passlib.handlers.bcrypt import bcrypt as passlib_bcrypt
 from app.config import settings
 from app.models.user import User, UserRole
 from app.models.refresh_token import RefreshToken
@@ -110,6 +111,14 @@ async def login(payload: LoginRequest, request: Request,
     if not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
 
+    # Silently repair incorrectly-padded bcrypt hashes in the DB
+    try:
+        normalized = passlib_bcrypt.normhash(user.hashed_password)
+        if normalized != user.hashed_password:
+            user.hashed_password = hash_password(payload.password)
+    except Exception:
+        pass
+
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Account disabled")
 
@@ -126,7 +135,11 @@ async def refresh_tokens(payload: RefreshRequest, request: Request,
         select(RefreshToken).where(RefreshToken.token_hash == token_hash)
     )).scalar_one_or_none()
 
-    if rt is None or rt.revoked_at is not None or rt.expires_at < datetime.now(timezone.utc):
+    if rt is None or rt.revoked_at is not None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired refresh token")
+        
+    expires = rt.expires_at.replace(tzinfo=timezone.utc) if rt.expires_at.tzinfo is None else rt.expires_at
+    if expires < datetime.now(timezone.utc):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired refresh token")
 
     user = await db.get(User, rt.user_id)

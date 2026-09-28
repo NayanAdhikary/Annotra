@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useAnnotationStore } from '../../store/annotationStore';
+import { useAnnotationStore } from '../store/annotationStore';
 
 interface Props {
   width: number;

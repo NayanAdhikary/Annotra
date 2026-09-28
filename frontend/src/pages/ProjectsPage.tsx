@@ -1,13 +1,34 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { projectsAPI } from '../api/project';
+import { useAuthStore } from '../store/authStore';
 
 export const ProjectsPage: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const queryClient = useQueryClient();
+    const nav = useNavigate();
+    const user = useAuthStore((s) => s.user);
+    const isAdmin = user?.role === 'admin' || user?.role === 'manager';
+
+    const openProject = async (projectId: number) => {
+        try {
+            const tasks = await projectsAPI.listTasks(projectId);
+            if (tasks.length === 0) {
+                nav(`/projects/${projectId}`);
+                return;
+            }
+            if (tasks.length === 1) {
+                nav(`/tasks/${tasks[0].id}`);
+                return;
+            }
+            nav(`/projects/${projectId}`);
+        } catch {
+            nav(`/projects/${projectId}`);
+        }
+    };
 
     const { data: projects, isLoading } = useQuery({
         queryKey: ['projects'],
@@ -30,32 +51,43 @@ export const ProjectsPage: React.FC = () => {
         <div className="max-w-6xl mx-auto p-8">
             <div className="flex justify-between items-center mb-8">
                 <h1 className="text-2xl font-bold text-slate-900">Projects</h1>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 font-medium"
-                >
-                    Create project
-                </button>
-            </div>
-
-            {!projects?.length ? (
-                <div className="text-center py-20 bg-white rounded-lg border border-slate-200">
-                    <h3 className="text-lg font-medium text-slate-900 mb-2">No projects yet</h3>
-                    <p className="text-slate-500 mb-6">Create your first project to get started with annotation.</p>
+                {isAdmin && (
                     <button
                         onClick={() => setIsModalOpen(true)}
                         className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 font-medium"
                     >
                         Create project
                     </button>
+                )}
+            </div>
+
+            {!projects?.length ? (
+                <div className="text-center py-20 bg-white rounded-lg border border-slate-200">
+                    <div className="text-5xl mb-4 text-slate-300">📁</div>
+                    <h3 className="text-lg font-medium text-slate-900 mb-2">
+                        {isAdmin ? 'No projects yet' : 'No projects assigned to you'}
+                    </h3>
+                    <p className="text-slate-500 mb-6">
+                        {isAdmin
+                            ? 'Create your first project to get started with annotation.'
+                            : 'You have not been assigned to any project tasks yet. Contact your admin.'}
+                    </p>
+                    {isAdmin && (
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 font-medium"
+                        >
+                            Create project
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {projects.map((p) => (
-                        <Link
+                        <button
                             key={p.id}
-                            to={`/projects/${p.id}`}
-                            className="block bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow group"
+                            onClick={() => openProject(p.id)}
+                            className="block w-full text-left bg-white border border-slate-200 rounded-lg p-5 hover:border-indigo-400 hover:shadow-sm transition group"
                         >
                             <h3 className="text-lg font-semibold text-slate-900 group-hover:text-indigo-600 mb-2">
                                 {p.name}
@@ -69,12 +101,12 @@ export const ProjectsPage: React.FC = () => {
                                 <div><span className="font-medium text-slate-700">{p.task_count}</span> tasks</div>
                                 <div><span className="font-medium text-slate-700">{p.image_count}</span> images</div>
                             </div>
-                        </Link>
+                        </button>
                     ))}
                 </div>
             )}
 
-            {isModalOpen && (
+            {isAdmin && isModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
                         <h2 className="text-xl font-semibold mb-4 text-slate-900">Create Project</h2>

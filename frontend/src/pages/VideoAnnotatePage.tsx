@@ -27,10 +27,13 @@ export const VideoAnnotatePage: React.FC = () => {
   const [taskName, setTaskName] = useState('');
   const [loading, setLoading] = useState(true);
   const [polling, setPolling] = useState(true);
-  const [taskStatus, setTaskStatus] = useState<string>('');
+  const [taskStatus, setTaskStatusLocal] = useState<string>('');
 
   useEffect(() => {
-    tasksApi.get(id).then((t) => setTaskStatus(t.status));
+    tasksApi.get(id).then((t) => {
+      setTaskStatusLocal(t.status);
+      useAnnotationStore.getState().setTaskStatus(t.status);
+    });
   }, [id]);
 
   const setVideoStore = useVideoStore((s) => s.setVideo);

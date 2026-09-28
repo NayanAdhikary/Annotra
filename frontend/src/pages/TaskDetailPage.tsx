@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { tasksApi, TaskDetail, Comment, TaskStatus, TaskPriority } from '../api/tasks';
+import { tasksApi } from '../api/tasks';
+import type { TaskDetail, Comment, TaskStatus, TaskPriority } from '../api/tasks';
 import { useAuthStore } from '../store/authStore';
 import { TaskComments } from '../components/Tasks/TaskComments';
 
