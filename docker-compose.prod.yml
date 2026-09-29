@@ -1,0 +1,107 @@
+name: annotra
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+x-backend-common: &backend-common
+  image: ${REGISTRY:-annotra}/backend:${TAG:-latest}
+  restart: unless-stopped
+  env_file: .env.prod
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  volumes:
+    - annotra-data:/data
+  logging: *default-logging
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    # Not exposed to host — only reachable from other containers
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *default-logging
+
+  backend:
+    <<: *backend-common
+    # Not exposed to host — nginx-frontend proxies /api
+
+  worker-light:
+    <<: *backend-common
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4 -Q light
+
+  worker-medium:
+    <<: *backend-common
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -Q medium
+
+  worker-heavy:
+    <<: *backend-common
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=1 -Q heavy
+    # On a CPU-only box, YOLO inference will peg this core. Fine.
+
+  beat:
+    <<: *backend-common
+    command: celery -A app.workers.celery_app beat --loglevel=info
+
+  frontend:
+    image: ${REGISTRY:-annotra}/frontend:${TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    logging: *default-logging
+    # Public entry point — bound to host port 80 (Cloudflare Tunnel / Caddy in front)
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend
+    logging: *default-logging
+
+volumes:
+  postgres-data:
+  redis-data:
+  annotra-data:
+  caddy-data:
+  caddy-config:

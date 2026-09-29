@@ -1,6 +1,14 @@
 from celery import Celery
 from app.config import settings
+import sentry_sdk
 
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENVIRONMENT,
+        release=settings.RELEASE,
+        traces_sample_rate=0.05,
+    )
 
 celery_app = Celery(
     "annotra",

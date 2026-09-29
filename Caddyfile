@@ -1,0 +1,31 @@
+{$DOMAIN} {
+    encode gzip zstd
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        -Server
+    }
+
+    # API and static → backend via frontend nginx (which already proxies)
+    # Actually, frontend nginx handles /api and /static, so Caddy just forwards
+    # everything to the frontend container.
+    reverse_proxy frontend:80
+
+    # Request size — allow huge image/video uploads
+    request_body {
+        max_size 2GB
+    }
+
+    log {
+        output file /data/access.log {
+            roll_size 100mb
+            roll_keep 5
+        }
+        format json
+    }
+}
