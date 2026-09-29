@@ -19,6 +19,7 @@ from app.models.system_config import SystemConfig
 from app.models.api_key import ApiKey
 from app.models.admin_notification import AdminNotification
 from app.services.audit import audit
+from app.services import cache
 from app.schemas.auth import UserResponse
 from app.schemas.admin import (
     AdminCreateUser, AdminUpdateUser, AdminResetPassword, AdminUserDetail,
@@ -41,49 +42,53 @@ ADMIN_ONLY = Depends(require_role(UserRole.ADMIN))
 
 @router.get("/stats", response_model=SystemStats)
 async def system_stats(db: AsyncSession = Depends(get_db), _: User = ADMIN_ONLY):
-    now = datetime.now(timezone.utc)
-    week_ago = now - timedelta(days=7)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    async def compute():
+        now = datetime.now(timezone.utc)
+        week_ago = now - timedelta(days=7)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    total_users = (await db.execute(select(func.count()).select_from(User))).scalar_one()
-    active_users_7d = (await db.execute(
-        select(func.count()).select_from(User).where(User.last_login_at >= week_ago)
-    )).scalar_one()
-    total_projects = (await db.execute(select(func.count()).select_from(Project))).scalar_one()
-    total_tasks = (await db.execute(select(func.count()).select_from(Task))).scalar_one()
-    total_images = (await db.execute(select(func.count()).select_from(ImageAsset))).scalar_one()
-    total_annotations = (await db.execute(select(func.count()).select_from(Annotation))).scalar_one()
-    annotations_today = (await db.execute(
-        select(func.count()).select_from(Annotation).where(Annotation.created_at >= today_start)
-    )).scalar_one()
+        total_users = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+        active_users_7d = (await db.execute(
+            select(func.count()).select_from(User).where(User.last_login_at >= week_ago)
+        )).scalar_one()
+        total_projects = (await db.execute(select(func.count()).select_from(Project))).scalar_one()
+        total_tasks = (await db.execute(select(func.count()).select_from(Task))).scalar_one()
+        total_images = (await db.execute(select(func.count()).select_from(ImageAsset))).scalar_one()
+        total_annotations = (await db.execute(select(func.count()).select_from(Annotation))).scalar_one()
+        annotations_today = (await db.execute(
+            select(func.count()).select_from(Annotation).where(Annotation.created_at >= today_start)
+        )).scalar_one()
 
-    # Storage: sum sizes of the images directory
-    total_bytes = 0
-    for root, _, files in os.walk("/data/images"):
-        for f in files:
-            try:
-                total_bytes += os.path.getsize(os.path.join(root, f))
-            except OSError:
-                pass
+        # Storage: sum sizes of the images directory
+        total_bytes = 0
+        for root, _, files in os.walk("/data/images"):
+            for f in files:
+                try:
+                    total_bytes += os.path.getsize(os.path.join(root, f))
+                except OSError:
+                    pass
 
-    try:
-        disk = shutil.disk_usage("/data")
-        disk_free = disk.free
-    except OSError:
-        disk_free = 0
+        try:
+            disk = shutil.disk_usage("/data")
+            disk_free = disk.free
+        except OSError:
+            disk_free = 0
 
-    return SystemStats(
-        total_users=total_users,
-        active_users_7d=active_users_7d,
-        total_projects=total_projects,
-        total_tasks=total_tasks,
-        total_images=total_images,
-        total_videos=0,   # wired on Day 14
-        total_annotations=total_annotations,
-        annotations_today=annotations_today,
-        storage_bytes=total_bytes,
-        disk_free_bytes=disk_free,
-    )
+        return {
+            "total_users": total_users,
+            "active_users_7d": active_users_7d,
+            "total_projects": total_projects,
+            "total_tasks": total_tasks,
+            "total_images": total_images,
+            "total_videos": 0,
+            "total_annotations": total_annotations,
+            "annotations_today": annotations_today,
+            "storage_bytes": total_bytes,
+            "disk_free_bytes": disk_free,
+        }
+    
+    data = await cache.get_or_set("admin_stats", ("global",), 30, compute)
+    return SystemStats(**data)
 
 
 # ---------------- Users ----------------
@@ -115,26 +120,33 @@ async def list_users(
     users = (await db.execute(stmt)).scalars().all()
 
     out = []
-    for u in users:
-        proj_count = (await db.execute(
-            select(func.count()).select_from(Project).where(Project.owner_id == u.id)
-        )).scalar_one()
-        ann_count = (await db.execute(
-            select(func.count()).select_from(Annotation).where(Annotation.created_at >= u.created_at)
-        )).scalar_one()  # simplification; full query would join on user_id once we add it
-        sessions = (await db.execute(
-            select(func.count()).select_from(RefreshToken)
-            .where(RefreshToken.user_id == u.id,
-                   RefreshToken.revoked_at.is_(None),
-                   RefreshToken.expires_at > datetime.now(timezone.utc))
-        )).scalar_one()
+    if not users:
+        return out
+        
+    u_ids = [u.id for u in users]
+    proj_counts = dict((await db.execute(
+        select(Project.owner_id, func.count()).where(Project.owner_id.in_(u_ids)).group_by(Project.owner_id)
+    )).all())
+    
+    ann_counts = dict((await db.execute(
+        select(Annotation.created_by, func.count())
+        .where(Annotation.created_by.in_(u_ids))
+        .group_by(Annotation.created_by)
+    )).all())
+    
+    session_counts = dict((await db.execute(
+        select(RefreshToken.user_id, func.count())
+        .where(RefreshToken.user_id.in_(u_ids), RefreshToken.revoked_at.is_(None), RefreshToken.expires_at > datetime.now(timezone.utc))
+        .group_by(RefreshToken.user_id)
+    )).all())
 
+    for u in users:
         out.append(AdminUserDetail(
             id=u.id, email=u.email, username=u.username, full_name=u.full_name,
             role=u.role, is_active=u.is_active,
             last_login_at=u.last_login_at, created_at=u.created_at,
-            project_count=proj_count, task_count=0,
-            annotation_count=ann_count, active_sessions=sessions,
+            project_count=proj_counts.get(u.id, 0), task_count=0,
+            annotation_count=ann_counts.get(u.id, 0), active_sessions=session_counts.get(u.id, 0),
         ))
     return out
 
@@ -383,56 +395,62 @@ async def list_audit(
 
 import asyncio
 
-@router.get("/health", response_model=HealthReport)
+from sqlalchemy import text
+import psutil
+import time
+from app.main import _START_TIME
+
+@router.get("/health")
 async def health(db: AsyncSession = Depends(get_db), _: User = ADMIN_ONLY):
-    report = HealthReport(
-        database=False, redis=False, storage_writable=False,
-        celery_workers=0, pending_jobs=0,
-        versions={"api": "0.1.0"},
-    )
+    t0 = time.perf_counter()
+    await db.execute(text("SELECT 1"))
+    db_ping_ms = int((time.perf_counter() - t0) * 1000)
 
-    # Database
-    try:
-        await asyncio.wait_for(db.execute(select(1)), timeout=1.0)
-        report.database = True
-    except Exception:
-        report.database = False
-
-    # Redis + queue depth
+    redis_ok = False
+    redis_ping_ms = 0
     try:
         r = get_redis()
+        t1 = time.perf_counter()
         await asyncio.wait_for(r.ping(), timeout=1.0)
-        report.redis = True
-        try:
-            report.pending_jobs = (
-                await asyncio.wait_for(r.llen("celery"), timeout=1.0)
-            )
-        except Exception:
-            report.pending_jobs = 0
+        redis_ping_ms = int((time.perf_counter() - t1) * 1000)
+        redis_ok = True
     except Exception:
-        report.redis = False
+        pass
 
-    # Storage
-    try:
-        test_path = "/data/.healthcheck"
-        os.makedirs("/data", exist_ok=True)
-        with open(test_path, "w") as f:
-            f.write("ok")
-        os.remove(test_path)
-        report.storage_writable = True
-    except Exception:
-        report.storage_writable = False
+    # DB pool stats
+    from app.core.database import engine
+    pool = engine.pool
+    pool_stats = {
+        "size": pool.size(),
+        "checked_in": pool.checkedin(),
+        "checked_out": pool.checkedout(),
+        "overflow": pool.overflow(),
+    }
 
-    # Celery worker count (best-effort via inspect; returns quickly or 0)
+    # Disk usage
+    disk = psutil.disk_usage("/data")
+
+    celery_workers = 0
     try:
         from app.workers import celery_app
         inspect = celery_app.control.inspect(timeout=1.0)
         pong = await asyncio.to_thread(inspect.ping) or {}
-        report.celery_workers = len(pong)
+        celery_workers = len(pong)
     except Exception:
-        report.celery_workers = 0
+        pass
 
-    return report
+    return {
+        "database": {"ok": True, "ping_ms": db_ping_ms, "pool": pool_stats},
+        "redis": {"ok": redis_ok, "ping_ms": redis_ping_ms},
+        "celery": {"workers": celery_workers},
+        "storage": {
+            "total_gb": round(disk.total / 1e9, 2),
+            "used_gb": round(disk.used / 1e9, 2),
+            "free_gb": round(disk.free / 1e9, 2),
+            "percent": disk.percent,
+        },
+        "uptime_sec": int(time.time() - _START_TIME),
+    }
 
 
 # ---------------- Projects (admin view) ----------------
@@ -455,28 +473,38 @@ async def list_all_projects(
     projects = (await db.execute(stmt)).scalars().all()
 
     out = []
+    if not projects:
+        return out
+        
+    p_ids = [p.id for p in projects]
+    owner_ids = list({p.owner_id for p in projects})
+    users_dict = dict((await db.execute(select(User.id, User).where(User.id.in_(owner_ids)))).all())
+    
+    task_counts = dict((await db.execute(select(Task.project_id, func.count()).where(Task.project_id.in_(p_ids)).group_by(Task.project_id))).all())
+    
+    img_counts = dict((await db.execute(
+        select(Task.project_id, func.count(ImageAsset.id))
+        .join(Task, Task.id == ImageAsset.task_id)
+        .where(Task.project_id.in_(p_ids))
+        .group_by(Task.project_id)
+    )).all())
+    
+    ann_counts = dict((await db.execute(
+        select(Task.project_id, func.count(Annotation.id))
+        .join(Task, Task.id == Annotation.task_id)
+        .where(Task.project_id.in_(p_ids))
+        .group_by(Task.project_id)
+    )).all())
+
     for p in projects:
-        owner = await db.get(User, p.owner_id)
-        task_count = (await db.execute(
-            select(func.count()).select_from(Task).where(Task.project_id == p.id)
-        )).scalar_one()
-        image_count = (await db.execute(
-            select(func.count()).select_from(ImageAsset)
-            .join(Task, Task.id == ImageAsset.task_id)
-            .where(Task.project_id == p.id)
-        )).scalar_one()
-        ann_count = (await db.execute(
-            select(func.count()).select_from(Annotation)
-            .join(Task, Task.id == Annotation.task_id)
-            .where(Task.project_id == p.id)
-        )).scalar_one()
+        owner = users_dict.get(p.owner_id)
         out.append(AdminProjectRow(
             id=p.id, name=p.name, description=p.description,
             owner_id=p.owner_id,
             owner_email=owner.email if owner else None,
             owner_name=(owner.full_name or owner.username) if owner else None,
-            task_count=task_count, image_count=image_count,
-            annotation_count=ann_count, created_at=p.created_at,
+            task_count=task_counts.get(p.id, 0), image_count=img_counts.get(p.id, 0),
+            annotation_count=ann_counts.get(p.id, 0), created_at=p.created_at,
         ))
     return out
 
@@ -562,28 +590,39 @@ async def list_all_tasks(
     tasks = (await db.execute(stmt)).scalars().all()
 
     out = []
+    if not tasks:
+        return out
+        
+    t_ids = [t.id for t in tasks]
+    p_ids = list({t.project_id for t in tasks})
+    projects_dict = dict((await db.execute(select(Project.id, Project.name).where(Project.id.in_(p_ids)))).all())
+    
+    img_counts = dict((await db.execute(select(ImageAsset.task_id, func.count()).where(ImageAsset.task_id.in_(t_ids)).group_by(ImageAsset.task_id))).all())
+    label_counts = dict((await db.execute(select(Label.task_id, func.count()).where(Label.task_id.in_(t_ids)).group_by(Label.task_id))).all())
+    ann_counts = dict((await db.execute(select(Annotation.task_id, func.count(func.distinct(Annotation.image_id))).where(Annotation.task_id.in_(t_ids)).group_by(Annotation.task_id))).all())
+    
+    assigns = (await db.execute(select(TaskAssignment).where(TaskAssignment.task_id.in_(t_ids)))).scalars().all()
+    user_ids = list({a.user_id for a in assigns})
+    users_dict = dict((await db.execute(select(User.id, User).where(User.id.in_(user_ids)))).all()) if user_ids else {}
+    
+    assigns_by_task = {}
+    for a in assigns:
+        u = users_dict.get(a.user_id)
+        assigns_by_task.setdefault(a.task_id, []).append({
+            "user_id": a.user_id, "role": a.role,
+            "name": (u.full_name or u.username) if u else None,
+            "email": u.email if u else None,
+        })
+
     for t in tasks:
-        project = await db.get(Project, t.project_id)
-        ic, lc, ac = await _task_stats(db, t.id)
-
-        # Load assignments
-        assigns = (await db.execute(
-            select(TaskAssignment).where(TaskAssignment.task_id == t.id)
-        )).scalars().all()
-        assignees = []
-        for a in assigns:
-            u = await db.get(User, a.user_id)
-            assignees.append({
-                "user_id": a.user_id, "role": a.role,
-                "name": (u.full_name or u.username) if u else None,
-                "email": u.email if u else None,
-            })
-
+        assignees = assigns_by_task.get(t.id, [])
         out.append(AdminTaskRow(
             id=t.id, project_id=t.project_id,
-            project_name=project.name if project else "",
+            project_name=projects_dict.get(t.project_id, ""),
             name=t.name, task_type=t.task_type, status=t.status,
-            image_count=ic, label_count=lc, annotated_count=ac,
+            image_count=img_counts.get(t.id, 0), 
+            label_count=label_counts.get(t.id, 0), 
+            annotated_count=ann_counts.get(t.id, 0),
             annotator_count=sum(1 for a in assignees if a["role"] == "annotator"),
             reviewer_count=sum(1 for a in assignees if a["role"] == "reviewer"),
             assignees=assignees,
@@ -708,7 +747,8 @@ async def review_annotations(
         a.reviewed_by = admin.id
         a.reviewed_at = now
         a.review_comment = payload.comment
-
+        
+    await cache.invalidate("review_queue", task_id)
     await audit(db, user=admin, action=f"annotation.review_{payload.action}",
                 resource_type="task", resource_id=task_id,
                 meta={"count": len(anns), "annotation_ids": payload.annotation_ids[:20]},

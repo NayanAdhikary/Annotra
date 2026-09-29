@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
 import useImage from 'use-image';
 import type Konva from 'konva';
@@ -40,6 +40,11 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
     annotations, labels, selectedIds, currentTool, activeLabelId, frame,
     attachServerId, selectOne, toggleSelect, setTool, taskStatus
   } = useAnnotationStore();
+
+  const labelById = useMemo(
+    () => new Map(labels.map((l) => [l.id, l])),
+    [labels],
+  );
   
   const readOnly = taskStatus === 'completed' || taskStatus === 'archived';
 
@@ -269,7 +274,7 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
             <ShapeRenderer
               key={a.id}
               annotation={a}
-              label={labels.find((l) => l.id === a.labelId)}
+              label={labelById.get(a.labelId)}
               selected={selectedIds.includes(a.id)}
               nodeRefs={nodeRefs}
               onSelect={(e) => {
@@ -318,7 +323,7 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
             height={height}
             mask={brush.getMask()}
             version={brush.version}
-            color={labels.find((l) => l.id === activeLabelId)?.color ?? '#FF0000'}
+            color={activeLabelId ? labelById.get(activeLabelId)?.color ?? '#FF0000' : '#FF0000'}
           />
         </div>
       )}

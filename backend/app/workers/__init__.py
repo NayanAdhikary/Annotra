@@ -18,6 +18,15 @@ celery_app.conf.update(
     worker_max_tasks_per_child=50,  # guards against ffmpeg leaks
     task_always_eager=True,
     task_eager_propagates=True,
+    task_routes={
+        "video.extract_frames": {"queue": "heavy"},
+        "inference.run": {"queue": "heavy"},
+        "export.build": {"queue": "medium"},
+        "import.run": {"queue": "medium"},
+        "cleanup.expired_exports": {"queue": "light"},
+        "notification.send_email": {"queue": "light"},
+    },
+    task_default_queue="medium",
 )
 
 celery_app.conf.beat_schedule = {

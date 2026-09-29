@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { useRafThrottle } from '../../hooks/useRafThrottle';
 import { Circle, Group } from 'react-konva';
 import { useAnnotationStore } from '../../store/annotationStore';
 import type { Annotation } from '../../types/annotation';
@@ -38,6 +39,11 @@ export const VertexHandles: React.FC<Props> = ({ annotation, scale }) => {
     next[i * 2 + 1] = y;
     replaceAnnotation(annotation.id, { points: next });
   };
+  const rafSetVertex = useRafThrottle((i: number, x: number, y: number) => {
+    setVertex(i, x, y);
+  });
+  
+
 
   const deleteVertex = (i: number) => {
     if (n <= minVerts) return;
@@ -105,7 +111,7 @@ export const VertexHandles: React.FC<Props> = ({ annotation, scale }) => {
             }}
             onDragStart={() => { dragStartRef.current = [...annotation.points]; }}
             onDragMove={(e) => {
-              setVertex(i, e.target.x(), e.target.y());
+              rafSetVertex(i, e.target.x(), e.target.y());
             }}
             onDragEnd={(e) => {
               const next = [...annotation.points];

@@ -45,12 +45,11 @@ export interface AuditEntry {
 export interface AuditPage { total: number; items: AuditEntry[]; }
 
 export interface HealthReport {
-  database: boolean;
-  redis: boolean;
-  storage_writable: boolean;
-  celery_workers: number;
-  pending_jobs: number;
-  versions: Record<string, string>;
+  database: { ok: boolean; ping_ms: number; pool: any };
+  redis: { ok: boolean; ping_ms: number };
+  celery: { workers: number };
+  storage: { total_gb: number; used_gb: number; free_gb: number; percent: number };
+  uptime_sec: number;
 }
 
 export const adminApi = {

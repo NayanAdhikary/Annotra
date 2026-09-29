@@ -8,6 +8,7 @@ from app.models.api_key import ApiKey
 from app.models.admin_notification import AdminNotification
 from app.models.task_assignment import TaskAssignment
 from app.models.export_job import ExportJob, ImportJob
+from app.models.notification import Notification
 
 __all__ = [
     "User",
@@ -24,5 +25,6 @@ __all__ = [
     "AdminNotification",
     "TaskAssignment",
     "ExportJob",
-    "ImportJob"
+    "ImportJob",
+    "Notification"
 ]

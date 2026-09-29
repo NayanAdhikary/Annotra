@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, distinct
 from typing import List
 from app.services.audit import audit
+from app.services import cache
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.user import User, UserRole
@@ -77,15 +78,40 @@ async def list_projects(
 
     projects = (await db.execute(q)).scalars().all()
     out = []
+    if not projects:
+        return out
+        
+    p_ids = [p.id for p in projects]
+    task_counts = dict((await db.execute(select(Task.project_id, func.count()).where(Task.project_id.in_(p_ids)).group_by(Task.project_id))).all())
+    
+    img_counts = dict((await db.execute(
+        select(Task.project_id, func.count(ImageAsset.id))
+        .join(Task, Task.id == ImageAsset.task_id)
+        .where(Task.project_id.in_(p_ids))
+        .group_by(Task.project_id)
+    )).all())
+    
+    status_counts = (await db.execute(
+        select(Task.project_id, Task.status, func.count())
+        .where(Task.project_id.in_(p_ids))
+        .group_by(Task.project_id, Task.status)
+    )).all()
+    
+    by_status = {}
+    for pid, st, c in status_counts:
+        by_status.setdefault(pid, {})[st] = c
+
     for p in projects:
-        tc, ic, cc, rc, ac = await _project_stats(db, p.id)
+        st = by_status.get(p.id, {})
         out.append(ProjectResponse(
             id=p.id, name=p.name, description=p.description,
-            owner_id=p.owner_id, task_count=tc, image_count=ic,
+            owner_id=p.owner_id, 
+            task_count=task_counts.get(p.id, 0), 
+            image_count=img_counts.get(p.id, 0),
             created_at=p.created_at,
-            completed_task_count=cc,
-            in_review_task_count=rc,
-            annotation_task_count=ac,
+            completed_task_count=st.get('completed', 0),
+            in_review_task_count=st.get('review', 0),
+            annotation_task_count=st.get('annotation', 0),
         ))
     return out
 
@@ -229,8 +255,46 @@ async def list_tasks(
         )).scalars().all()
 
     out = []
+    if not tasks:
+        return out
+        
+    t_ids = [t.id for t in tasks]
+    img_counts = dict((await db.execute(select(ImageAsset.task_id, func.count()).where(ImageAsset.task_id.in_(t_ids)).group_by(ImageAsset.task_id))).all())
+    label_counts = dict((await db.execute(select(Label.task_id, func.count()).where(Label.task_id.in_(t_ids)).group_by(Label.task_id))).all())
+    ann_counts = dict((await db.execute(select(Annotation.task_id, func.count(func.distinct(Annotation.image_id))).where(Annotation.task_id.in_(t_ids)).group_by(Annotation.task_id))).all())
+    
+    com_counts = dict((await db.execute(select(TaskComment.task_id, func.count()).where(TaskComment.task_id.in_(t_ids)).group_by(TaskComment.task_id))).all())
+    open_com_counts = dict((await db.execute(select(TaskComment.task_id, func.count()).where(TaskComment.task_id.in_(t_ids), TaskComment.resolved.is_(False)).group_by(TaskComment.task_id))).all())
+    
+    assigns = (await db.execute(select(TaskAssignment).where(TaskAssignment.task_id.in_(t_ids)))).scalars().all()
+    user_ids = list({a.user_id for a in assigns})
+    users_dict = dict((await db.execute(select(User.id, User).where(User.id.in_(user_ids)))).all()) if user_ids else {}
+    
+    assigns_by_task = {}
+    for a in assigns:
+        u = users_dict.get(a.user_id)
+        assigns_by_task.setdefault(a.task_id, []).append({
+            'user_id': a.user_id, 'role': a.role,
+            'name': (u.full_name or u.username) if u else None,
+            'email': u.email if u else None,
+        })
+
     for t in tasks:
-        out.append(await _task_response(db, t))
+        assignees = assigns_by_task.get(t.id, [])
+        out.append(TaskResponse(
+            id=t.id, project_id=t.project_id,
+            project_name=project.name if project else None,
+            name=t.name, task_type=t.task_type, status=t.status,
+            priority=t.priority, due_at=t.due_at,
+            description=t.description, instructions=t.instructions,
+            image_count=img_counts.get(t.id, 0), label_count=label_counts.get(t.id, 0),
+            annotated_count=ann_counts.get(t.id, 0),
+            comment_count=com_counts.get(t.id, 0), open_comment_count=open_com_counts.get(t.id, 0),
+            assignees=assignees,
+            archived_at=t.archived_at, completed_at=t.completed_at,
+            created_at=t.created_at, updated_at=t.updated_at,
+            last_submitted_at=t.last_submitted_at, last_submitted_by=t.last_submitted_by,
+        ))
     return out
 
 
@@ -265,10 +329,17 @@ async def create_task(
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
 async def get_task(task_id: int, db: AsyncSession = Depends(get_db),
                    user: User = Depends(get_current_user)):
-    t = await db.get(Task, task_id)
-    if t is None:
-        raise HTTPException(404, "Task not found")
-    return await _task_response(db, t)
+    async def compute():
+        t = await db.get(Task, task_id)
+        if t is None:
+            raise HTTPException(404, "Task not found")
+        resp = await _task_response(db, t)
+        # return a dict so it can be cached cleanly as JSON
+        # datetime fields need to be handled, but model_dump with mode='json' is great
+        return resp.model_dump(mode='json')
+        
+    data = await cache.get_or_set("task_stats", (task_id,), 10, compute)
+    return TaskResponse(**data)
 
 
 @router.patch("/tasks/{task_id}", response_model=TaskResponse)
@@ -344,6 +415,8 @@ async def task_transition(
                 body="The task is now complete.",
             )
 
+    await cache.invalidate_prefix("admin_stats")
+    await cache.invalidate("task_stats", task_id)
     await audit(db, user=user, action="task.transition",
                 resource_type="task", resource_id=t.id,
                 meta={"from": old_status, "to": t.status}, request=request)
@@ -483,29 +556,50 @@ async def my_tasks(
                                             Task.created_at.desc()))).all()
 
     out = []
+    if not rows:
+        return out
+        
+    task_ids = [t.id for t, _ in rows]
+    project_ids = list({t.project_id for t, _ in rows})
+    
+    projects = dict((await db.execute(select(Project.id, Project.name).where(Project.id.in_(project_ids)))).all())
+    
+    img_counts = dict((await db.execute(
+        select(ImageAsset.task_id, func.count())
+        .where(ImageAsset.task_id.in_(task_ids))
+        .group_by(ImageAsset.task_id)
+    )).all())
+    
+    ann_counts = dict((await db.execute(
+        select(Annotation.task_id, func.count(func.distinct(Annotation.image_id)))
+        .where(Annotation.task_id.in_(task_ids))
+        .group_by(Annotation.task_id)
+    )).all())
+    
+    open_c_counts = dict((await db.execute(
+        select(TaskComment.task_id, func.count())
+        .where(TaskComment.task_id.in_(task_ids), TaskComment.resolved.is_(False))
+        .group_by(TaskComment.task_id)
+    )).all())
+    
+    rej_counts = dict((await db.execute(
+        select(Annotation.task_id, func.count())
+        .where(Annotation.task_id.in_(task_ids), Annotation.review_status == "rejected")
+        .group_by(Annotation.task_id)
+    )).all())
+
     for t, assignment_role in rows:
-        project = await db.get(Project, t.project_id)
-        ic, _, ac = await _task_stats(db, t.id)
-        open_c = (await db.execute(
-            select(func.count()).select_from(TaskComment)
-            .where(TaskComment.task_id == t.id, TaskComment.resolved.is_(False))
-        )).scalar_one()
-
-        rejected_c = (await db.execute(
-            select(func.count()).select_from(Annotation)
-            .where(Annotation.task_id == t.id, Annotation.review_status == "rejected")
-        )).scalar_one()
-
         out.append(MyTaskRow(
             id=t.id, project_id=t.project_id,
-            project_name=project.name if project else "",
+            project_name=projects.get(t.project_id, ""),
             name=t.name, task_type=t.task_type, status=t.status,
             priority=t.priority, due_at=t.due_at,
             role=assignment_role,
-            image_count=ic, annotated_count=ac,
-            open_comment_count=open_c,
+            image_count=img_counts.get(t.id, 0), 
+            annotated_count=ann_counts.get(t.id, 0),
+            open_comment_count=open_c_counts.get(t.id, 0),
             created_at=t.created_at,
-            rejected_annotation_count=rejected_c,
+            rejected_annotation_count=rej_counts.get(t.id, 0),
         ))
     return out
 
@@ -517,16 +611,19 @@ async def get_review_queue(
     # check permissions
     await _assert_can_read_task(db, task_id, user)
     
-    rejected = (await db.execute(
-        select(func.count()).select_from(Annotation)
-        .where(Annotation.task_id == task_id, Annotation.review_status == "rejected")
-    )).scalar_one()
+    async def compute():
+        rejected = (await db.execute(
+            select(func.count()).select_from(Annotation)
+            .where(Annotation.task_id == task_id, Annotation.review_status == "rejected")
+        )).scalar_one()
 
-    return {
-        "stats": {
-            "rejected": rejected
+        return {
+            "stats": {
+                "rejected": rejected
+            }
         }
-    }
+        
+    return await cache.get_or_set("review_queue", (task_id,), 5, compute)
 
 @router.post("/tasks/{task_id}/duplicate", response_model=TaskResponse,
              status_code=201)

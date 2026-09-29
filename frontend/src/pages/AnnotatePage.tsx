@@ -80,30 +80,15 @@ export const AnnotatePage: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
-        const [taskRes, labels, imgs, annExport] = await Promise.all([
+        const [taskRes, labels, imgs] = await Promise.all([
           taskApi.get(id),
           labelsApi.list(id),
           imagesApi.list(id),
-          annotationsApi.list(id),
         ]);
         if (cancelled) return;
         setTaskData(taskRes);
         setLabels(labels);
         setImages(imgs);
-
-        // Map CVAT export shape → internal Annotation
-        const mapped: Annotation[] = annExport.shapes.map((s: any, i: number) => ({
-          id: `srv-loaded-${i}`,
-          taskId: id,
-          frame: s.frame,
-          labelId: s.label_id,
-          shapeType: s.type,
-          points: s.points,
-          occluded: !!s.occluded,
-          source: s.source ?? 'manual',
-          groupId: s.group ?? 0,
-        }));
-        setAnnotations(mapped);
       } catch (e) {
         console.error('Failed to load task', e);
       } finally {
@@ -111,7 +96,16 @@ export const AnnotatePage: React.FC = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [id, setLabels, setAnnotations]);
+  }, [id, setLabels, setImages]);
+
+  const currentImageId = images.length > 0 ? images[Math.min(frame, images.length - 1)]?.id : undefined;
+
+  useEffect(() => {
+    if (!currentImageId) return;
+    annotationsApi.listForImage(id, currentImageId).then((anns) => {
+      setAnnotations(anns);
+    });
+  }, [id, currentImageId, setAnnotations]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

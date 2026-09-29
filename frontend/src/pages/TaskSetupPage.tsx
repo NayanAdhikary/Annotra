@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ImageUploader } from '../components/Upload/ImageUploader';
+import { ImageGrid } from '../components/Upload/ImageGrid';
 import { VideoUploader } from '../components/Video/VideoUploader';
 import { LabelManager } from '../components/LabelManager/LabelManager';
 import { taskApi, type Task } from '../api/project';
@@ -170,16 +171,7 @@ export const TaskSetupPage: React.FC = () => {
                                         <p className="text-slate-500 text-sm">Use the uploader above to add images.</p>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-4 gap-4 max-h-[500px] overflow-y-auto pr-2">
-                                        {images.map(img => (
-                                            <div key={img.id} className="relative aspect-square bg-slate-100 rounded-md overflow-hidden border border-slate-200 group">
-                                                <img src={img.url} alt={img.filename} className="object-cover w-full h-full" />
-                                                <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] truncate px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {img.filename}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <ImageGrid images={images} onOpen={() => navigate(`/tasks/${id}`)} />
                                 )}
                             </div>
                         </>

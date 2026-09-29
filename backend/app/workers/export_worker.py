@@ -69,21 +69,29 @@ def build_export(self, job_id: int):
                             "frame": idx,
                         })
 
-            anns = [
-                {
-                    "id": a.id, "image_id": a.image_id, "frame": a.frame,
-                    "label_id": a.label_id, "shape_type": a.shape_type,
-                    "points": a.points, "occluded": a.occluded,
-                    "attributes": a.attributes,
-                    "track_id": a.track_id,
-                    "is_keyframe": a.is_keyframe,
-                    "outside": a.outside,
-                    "source": a.source,
-                }
-                for a in db.execute(
-                    select(Annotation).where(Annotation.task_id == job.task_id)
-                ).scalars()
-            ]
+            anns = []
+            after_id = 0
+            while True:
+                batch = db.execute(
+                    select(Annotation)
+                    .where(Annotation.task_id == job.task_id, Annotation.id > after_id)
+                    .order_by(Annotation.id)
+                    .limit(5000)
+                ).scalars().all()
+                if not batch:
+                    break
+                for a in batch:
+                    anns.append({
+                        "id": a.id, "image_id": a.image_id, "frame": a.frame,
+                        "label_id": a.label_id, "shape_type": a.shape_type,
+                        "points": a.points, "occluded": a.occluded,
+                        "attributes": a.attributes,
+                        "track_id": a.track_id,
+                        "is_keyframe": a.is_keyframe,
+                        "outside": a.outside,
+                        "source": a.source,
+                    })
+                after_id = batch[-1].id
 
             ctx = ExportContext(
                 task_id=task.id, task_name=task.name,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import type Konva from 'konva';
 import type { Annotation, Label } from '../../types/annotation';
 import { RectShape } from './Shapes/RectShape';
@@ -14,7 +14,7 @@ interface Props {
   onSelect: (e: any) => void;
 }
 
-export const ShapeRenderer: React.FC<Props> = (props) => {
+const ShapeRendererImpl: React.FC<Props> = (props) => {
   switch (props.annotation.shapeType) {
     case 'rectangle': return <RectShape {...props} />;
     case 'polygon':
@@ -23,3 +23,12 @@ export const ShapeRenderer: React.FC<Props> = (props) => {
     case 'mask':      return <MaskKonvaShape {...props} />;
   }
 };
+
+export const ShapeRenderer = memo(ShapeRendererImpl, (prev, next) => {
+  if (prev.annotation !== next.annotation) return false;
+  if (prev.selected !== next.selected) return false;
+  if (prev.label?.color !== next.label?.color) return false;
+  if (prev.label?.name !== next.label?.name) return false;
+  // Anything else — don't re-render
+  return true;
+});

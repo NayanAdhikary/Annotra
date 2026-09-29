@@ -89,10 +89,12 @@ def run_import(self, job_id: int):
             skipped = 0
             unknown_labels: set[str] = set()
 
+            pending_rows = []
+            BATCH_SIZE = 1000
+
             for a in ds.annotations:
                 task_label_id = mapping.get(a.external_label)
                 if task_label_id is None:
-                    # fallback: case-insensitive match on the label name
                     task_label_id = task_labels.get(a.external_label.lower())
                 if task_label_id is None:
                     unknown_labels.add(a.external_label)
@@ -101,7 +103,6 @@ def run_import(self, job_id: int):
 
                 image_id = image_by_name.get(a.filename)
                 if image_id is None:
-                    # Try by basename
                     for k, v in image_by_name.items():
                         if os.path.basename(k) == os.path.basename(a.filename):
                             image_id = v
@@ -110,21 +111,33 @@ def run_import(self, job_id: int):
                     skipped += 1
                     continue
 
-                db.add(Annotation(
-                    task_id=job.task_id,
-                    image_id=image_id,
-                    label_id=task_label_id,
-                    shape_type=a.shape_type,
-                    points=a.points,
-                    frame=a.frame,
-                    occluded=a.occluded,
-                    attributes=a.attributes or [],
-                    source="auto" if job.as_preannotations else "manual",
-                    review_status="pending" if job.as_preannotations else "pending",
-                    is_keyframe=True,
-                    created_by=job.user_id,
-                ))
-                imported += 1
+                pending_rows.append({
+                    "task_id": job.task_id,
+                    "image_id": image_id,
+                    "label_id": task_label_id,
+                    "shape_type": a.shape_type,
+                    "points": a.points,
+                    "frame": a.frame,
+                    "occluded": a.occluded,
+                    "attributes": a.attributes or [],
+                    "source": "auto" if job.as_preannotations else "manual",
+                    "review_status": "pending",
+                    "is_keyframe": True,
+                    "created_by": job.user_id,
+                })
+                
+                if len(pending_rows) >= BATCH_SIZE:
+                    db.bulk_insert_mappings(Annotation, pending_rows)
+                    db.commit()
+                    imported += len(pending_rows)
+                    pending_rows = []
+                    job.progress = f"Imported {imported}"
+                    db.commit()
+
+            if pending_rows:
+                db.bulk_insert_mappings(Annotation, pending_rows)
+                db.commit()
+                imported += len(pending_rows)
 
             job.status = "done"
             job.progress = None

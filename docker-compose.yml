@@ -2,6 +2,7 @@ version: "3.9"
 services:
   postgres:
     image: postgres:16-alpine
+    command: postgres -c max_connections=300
     environment:
       POSTGRES_USER: annotra
       POSTGRES_PASSWORD: annotra
@@ -16,12 +17,24 @@ services:
     ports:
       - "6379:6379"
 
-  worker:
+  worker-light:
     build: ./backend
-    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
-    depends_on:
-      - postgres
-      - redis
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4 -Q light
+    depends_on: [redis, postgres]
+    volumes:
+      - ./data:/data
+
+  worker-medium:
+    build: ./backend
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -Q medium
+    depends_on: [redis, postgres]
+    volumes:
+      - ./data:/data
+
+  worker-heavy:
+    build: ./backend
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=1 -Q heavy
+    depends_on: [redis, postgres]
     volumes:
       - ./data:/data
 

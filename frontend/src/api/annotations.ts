@@ -9,6 +9,27 @@ export interface CreateAnnotationPayload {
   occluded?: boolean;
 }
 
+function mapShape(s: any, taskId: number): any {
+  return {
+    id: String(s.id),
+    serverId: s.id,
+    taskId,
+    frame: s.frame,
+    labelId: s.label_id,
+    shapeType: s.type,
+    points: s.points,
+    occluded: s.occluded,
+    source: s.source,
+    groupId: s.group,
+    attributes: s.attributes,
+    reviewStatus: s.review_status,
+    reviewedBy: s.reviewed_by,
+    reviewedAt: s.reviewed_at,
+    reviewComment: s.review_comment,
+    createdBy: s.created_by,
+  };
+}
+
 export const annotationsApi = {
   create: async (taskId: number, payload: CreateAnnotationPayload) => {
     const { data } = await api.post(`/api/tasks/${taskId}/annotations`, payload);
@@ -22,11 +43,19 @@ export const annotationsApi = {
   remove: async (annId: number) => {
     await api.delete(`/api/annotations/${annId}`);
   },
-  list: async (taskId: number, frame?: number) => {
+  listForImage: async (taskId: number, imageId: number): Promise<any[]> => {
     const { data } = await api.get(`/api/tasks/${taskId}/annotations`, {
-      params: frame !== undefined ? { frame } : {},
+      params: { image_id: imageId, limit: 2000 },
     });
-    return data;
+    return data.shapes.map((s: any) => mapShape(s, taskId));
+  },
+  listPage: async (taskId: number, params: {
+    image_id?: number; frame?: number;
+    review_status?: string; source?: string;
+    limit?: number; offset?: number;
+  }) => {
+    const { data } = await api.get(`/api/tasks/${taskId}/annotations`, { params });
+    return { total: data.total, shapes: data.shapes.map((s: any) => mapShape(s, taskId)) };
   },
   bulkPatch: async (
     taskId: number,

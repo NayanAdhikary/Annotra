@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
-from typing import List
+from typing import List, Optional
 from app.services.audit import audit
+from app.services import cache
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -185,14 +186,119 @@ async def delete_annotation(ann_id: int,
     await db.commit()
 
 
-@router.get("/tasks/{task_id}/annotations", response_model=List[AnnotationResponse])
-async def get_annotations(task_id: int, frame: int | None = None,
-                          db: AsyncSession = Depends(get_db)):
-    q = select(Annotation).where(Annotation.task_id == task_id)
+@router.get("/tasks/{task_id}/annotations")
+async def get_annotations(
+    task_id: int,
+    image_id: Optional[int] = Query(default=None),
+    frame: Optional[int] = Query(default=None),
+    review_status: Optional[str] = Query(default=None),
+    source: Optional[str] = Query(default=None),
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Always bounded. Prefer per-image queries for the workspace.
+    Response format keeps `shapes` for backward compatibility, adds pagination
+    metadata at the top.
+    """
+    from app.models.annotation import Annotation
+    from sqlalchemy import func
+
+    where = [Annotation.task_id == task_id]
+    if image_id is not None:
+        where.append(Annotation.image_id == image_id)
     if frame is not None:
-        q = q.where(Annotation.frame == frame)
-    res = await db.execute(q)
-    return res.scalars().all()
+        where.append(Annotation.frame == frame)
+    if review_status:
+        where.append(Annotation.review_status == review_status)
+    if source:
+        where.append(Annotation.source == source)
+
+    total = (await db.execute(
+        select(func.count()).select_from(Annotation).where(*where)
+    )).scalar_one()
+
+    rows = (await db.execute(
+        select(Annotation).where(*where)
+        .order_by(Annotation.frame, Annotation.id)
+        .limit(limit).offset(offset)
+    )).scalars().all()
+
+    shapes = [
+        {
+            "id": a.id,
+            "type": a.shape_type,
+            "frame": a.frame,
+            "image_id": a.image_id,
+            "label_id": a.label_id,
+            "group": a.group_id,
+            "source": a.source,
+            "attributes": a.attributes,
+            "points": a.points,
+            "occluded": a.occluded,
+            "review_status": a.review_status,
+            "reviewed_by": a.reviewed_by,
+            "reviewed_at": a.reviewed_at.isoformat() if a.reviewed_at else None,
+            "review_comment": a.review_comment,
+            "created_by": a.created_by,
+        }
+        for a in rows
+    ]
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "shapes": shapes,
+    }
+
+
+@router.get("/tasks/{task_id}/annotations/stream")
+async def stream_annotations(
+    task_id: int,
+    after_id: Optional[int] = Query(default=None),
+    limit: int = Query(default=1000, le=5000),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Keyset pagination. `after_id` is the last id you saw.
+    Stable, O(1) regardless of depth.
+    """
+    from app.models.annotation import Annotation
+    
+    stmt = select(Annotation).where(Annotation.task_id == task_id)
+    if after_id is not None:
+        stmt = stmt.where(Annotation.id > after_id)
+    stmt = stmt.order_by(Annotation.id).limit(limit)
+
+    rows = (await db.execute(stmt)).scalars().all()
+    shapes = [
+        {
+            "id": a.id,
+            "type": a.shape_type,
+            "frame": a.frame,
+            "image_id": a.image_id,
+            "label_id": a.label_id,
+            "group": a.group_id,
+            "source": a.source,
+            "attributes": a.attributes,
+            "points": a.points,
+            "occluded": a.occluded,
+            "review_status": a.review_status,
+            "reviewed_by": a.reviewed_by,
+            "reviewed_at": a.reviewed_at.isoformat() if a.reviewed_at else None,
+            "review_comment": a.review_comment,
+            "created_by": a.created_by,
+        }
+        for a in rows
+    ]
+    return {
+        "shapes": shapes,
+        "next_cursor": rows[-1].id if len(rows) == limit else None,
+    }
 
 
 @router.patch("/tasks/{task_id}/annotations/bulk")
