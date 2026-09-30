@@ -78,7 +78,9 @@ const Section: React.FC<{ title: string; tasks: MyTaskRow[]; highlight?: string 
               {tasks.map((t) => {
                 const due = dueBadge(t.due_at);
                 const pct = t.image_count ? (t.annotated_count / t.image_count) * 100 : 0;
-                const openUrl = `/tasks/${t.id}`;
+                const openUrl = t.role === 'reviewer' && t.status === 'review'
+                  ? `/tasks/${t.id}?tab=review`
+                  : `/tasks/${t.id}`;
                 const isHighlight = highlight && t.status === highlight;
                 
                 return (

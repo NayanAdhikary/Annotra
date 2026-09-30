@@ -6,11 +6,14 @@ import { AnnotationList } from './AnnotationList';
 import { TaskComments } from '../Tasks/TaskComments';
 import { RectInspector } from '../Inspector/RectInspector';
 import { AttributePanel } from '../Inspector/AttributePannel';
+import { ReviewQueuePanel } from './ReviewQueuePanel';
+import { ReviewActions } from '../canvas/ReviewActions';
+import { AnnotationCommentsPanel } from './AnnotationCommentsPanel';
 
-type Tab = 'objects' | 'comments';
+type Tab = 'objects' | 'comments' | 'review';
 
-export const WorkspaceSidebar: React.FC<{ taskId: number }> = ({ taskId }) => {
-  const [tab, setTab] = useState<Tab>('objects');
+export const WorkspaceSidebar: React.FC<{ taskId: number; initialTab?: Tab }> = ({ taskId, initialTab }) => {
+  const [tab, setTab] = useState<Tab>(initialTab || 'objects');
   const [comments, setComments] = useState<Comment[]>([]);
   const openCount = comments.filter((c) => !c.resolved).length;
 
@@ -45,17 +48,29 @@ export const WorkspaceSidebar: React.FC<{ taskId: number }> = ({ taskId }) => {
             </span>
           )}
         </button>
+        <button onClick={() => setTab('review')}
+                className={`flex-1 py-2 text-sm font-medium border-b-2 ${
+                  tab === 'review'
+                    ? 'border-indigo-600 text-indigo-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-900'
+                }`}>
+          Review
+        </button>
       </div>
 
-      {tab === 'objects' ? (
+      {tab === 'objects' && (
         <>
           <RectInspector />
+          <ReviewActions taskId={taskId} onReviewed={() => {}} />
           <AttributePanel />
           <AnnotationList />
+          <AnnotationCommentsPanel />
         </>
-      ) : (
+      )}
+      {tab === 'comments' && (
         <TaskComments taskId={taskId} comments={comments} onChanged={refresh} compact />
       )}
+      {tab === 'review' && <ReviewQueuePanel taskId={taskId} />}
     </aside>
   );
 };

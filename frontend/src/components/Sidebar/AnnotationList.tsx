@@ -5,6 +5,8 @@ import { useSaveStatus } from '../../hooks/useSaveStatus';
 import type { Annotation } from '../../types/annotation';
 import { useHistoryStore } from '../../store/historyStore';
 import { DeleteAnnotationCommand, DeleteManyCommand } from '../../commands/AnnotationCommands';
+import { ReviewBadge } from './ReviewBadge';
+import { useReviewStore } from '../../store/reviewStore';
 
 const ICON: Record<Annotation['shapeType'], string> = {
   rectangle: '▭',
@@ -20,8 +22,13 @@ export const AnnotationList: React.FC = () => {
   } = useAnnotationStore();
   const wrap = useSaveStatus();
   const execute = useHistoryStore((s) => s.execute);
+  const { filter, setFilter } = useReviewStore();
 
-  const visible = annotations.filter((a) => a.frame === frame);
+  const visible = annotations.filter((a) => {
+    if (a.frame !== frame) return false;
+    if (filter === 'all') return true;
+    return (a.reviewStatus ?? 'pending') === filter;
+  });
 
   useEffect(() => { selectOne(null); }, [frame, selectOne]);
 
@@ -76,6 +83,20 @@ export const AnnotationList: React.FC = () => {
         <span className="text-xs text-gray-500">{visible.length}</span>
       </header>
 
+      <div className="px-3 py-2 border-b flex gap-1 text-[11px]">
+        {(['all', 'pending', 'rejected', 'accepted'] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-2 py-0.5 rounded capitalize ${
+              filter === f ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
       <div className="flex-1 overflow-y-auto">
         {visible.map((a) => {
           const label = labels.find((l) => l.id === a.labelId);
@@ -93,8 +114,9 @@ export const AnnotationList: React.FC = () => {
                 {ICON[a.shapeType]}
               </span>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">
+                <div className="text-sm font-medium truncate flex items-center gap-2">
                   {label?.name ?? 'Unlabeled'}
+                  <ReviewBadge status={a.reviewStatus} />
                 </div>
                 <div className="text-[10px] text-gray-500">
                   #{a.serverId ?? a.id.slice(-4)} · {a.shapeType}

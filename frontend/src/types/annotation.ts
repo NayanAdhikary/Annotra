@@ -19,6 +19,12 @@ export interface Annotation {
   updatedAt?: string;
   conflict?: any;
   saveError?: any;
+
+  reviewStatus?: 'pending' | 'accepted' | 'rejected' | 'fixed';
+  reviewedBy?: number | null;
+  reviewedAt?: string | null;
+  reviewComment?: string | null;
+  createdBy?: number | null;
 }
 
 export interface Label {

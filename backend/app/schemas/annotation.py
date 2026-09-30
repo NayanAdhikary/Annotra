@@ -67,7 +67,14 @@ class AnnotationResponse(BaseModel):
     occluded: bool
     source: str
     group_id: int
-    updated_at: datetime
+
+    review_status: str = "pending"
+    reviewed_by: Optional[int] = None
+    reviewed_at: Optional[datetime] = None
+    review_comment: Optional[str] = None
+    created_by: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

@@ -9,6 +9,7 @@ from app.models.admin_notification import AdminNotification
 from app.models.task_assignment import TaskAssignment
 from app.models.export_job import ExportJob, ImportJob
 from app.models.notification import Notification
+from app.models.annotation_comment import AnnotationComment
 
 __all__ = [
     "User",
@@ -26,5 +27,6 @@ __all__ = [
     "TaskAssignment",
     "ExportJob",
     "ImportJob",
-    "Notification"
+    "Notification",
+    "AnnotationComment"
 ]

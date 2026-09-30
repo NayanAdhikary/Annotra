@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { Toolbar } from '../components/Toolbar/Toolbar';
 import { HistoryControls } from '../components/Toolbar/HistoryControls';
 import { AnnotationCanvas } from '../components/canvas/AnnotationCanvas';
@@ -15,6 +15,10 @@ import { useAutosaveQueue } from '../hooks/useAutosaveQueue';
 import { reviewApi } from '../api/review';
 import { useUnsavedGuard } from '../hooks/useUnsavedGuard';
 import { useBulkActions } from '../hooks/useBulkActions';
+import { useReviewKeys } from '../hooks/useReviewKeys';
+import { useReviewStore } from '../store/reviewStore';
+import { ReviewProgressBar } from '../components/Status/ReviewProgressBar';
+import { ReviewAdminActions } from '../components/Admin/ReviewAdminActions';
 
 import { UserMenu } from '../components/Layout/UserMenu';
 import type { Annotation } from '../types/annotation';
@@ -28,6 +32,8 @@ import { useZoomToSelection } from '../hooks/useZoomToSelection';
 export const AnnotatePage: React.FC = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const id = parseInt(taskId || '0', 10);
+  const [searchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as 'objects' | 'comments' | 'review') ?? 'objects';
 
   const { setTask, setLabels, setAnnotations, setFrame, frame, taskId: storeTaskId, setTaskStatus } =
     useAnnotationStore();
@@ -66,6 +72,13 @@ export const AnnotatePage: React.FC = () => {
   useCopyPaste();
   useTabNavigation();
   useZoomToSelection();
+
+  const setStats = useReviewStore((s) => s.setStats);
+  const refreshReview = async () => {
+    const q = await reviewApi.queue(id);
+    setStats(q.stats, q.pending_ids, q.rejected_ids);
+  };
+  useReviewKeys(id, refreshReview);
 
   useEffect(() => { useHistoryStore.getState().clear(); }, [id]);
 
@@ -190,6 +203,8 @@ export const AnnotatePage: React.FC = () => {
           <HistoryControls />
           <SaveIndicator />
           <div className="h-6 w-px bg-slate-200"></div>
+          <ReviewProgressBar />
+          <ReviewAdminActions taskId={id} onDone={refreshReview} />
           {taskStatus === 'annotation' && (
             <button
               onClick={async () => {
@@ -264,7 +279,7 @@ export const AnnotatePage: React.FC = () => {
         </div>
         
         {/* Sidebar */}
-        <WorkspaceSidebar taskId={id} />
+        <WorkspaceSidebar taskId={id} initialTab={initialTab} />
       </div>
 
       {/* Footer nav with Prev/Next and frame / total counter */}
