@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { reviewApi } from '../../api/review';
 import { useReviewStore } from '../../store/reviewStore';
 import { useAnnotationStore } from '../../store/annotationStore';
@@ -7,6 +7,7 @@ export const ReviewQueuePanel: React.FC<{ taskId: number }> = ({ taskId }) => {
   const { stats, pendingIds, rejectedIds, setStats } = useReviewStore();
   const selectOne = useAnnotationStore((s) => s.selectOne);
   const annotations = useAnnotationStore((s) => s.annotations);
+  const [showOnlyAuto, setShowOnlyAuto] = useState(false);
 
   const refresh = async () => {
     const q = await reviewApi.queue(taskId);
@@ -22,6 +23,13 @@ export const ReviewQueuePanel: React.FC<{ taskId: number }> = ({ taskId }) => {
   if (!stats) return <div className="p-4 text-xs text-slate-500">Loading…</div>;
 
   const pct = Math.round(stats.percent_reviewed * 100);
+
+  const filteredPending = showOnlyAuto
+    ? pendingIds.filter((id) => {
+        const a = annotations.find((x) => x.serverId === id);
+        return a?.source === 'auto';
+      })
+    : pendingIds;
 
   return (
     <div className="flex flex-col h-full">
@@ -67,12 +75,18 @@ export const ReviewQueuePanel: React.FC<{ taskId: number }> = ({ taskId }) => {
       )}
 
       {pendingIds.length > 0 && (
-        <div className="p-3 border-t">
-          <div className="text-xs font-medium text-slate-700 mb-2">
-            Pending ({pendingIds.length})
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {pendingIds.slice(0, 30).map((id) => (
+        <div className="border-t">
+          <label className="flex items-center gap-2 text-xs text-slate-600 mb-2 px-3 pt-3">
+            <input type="checkbox" checked={showOnlyAuto}
+                   onChange={(e) => setShowOnlyAuto(e.target.checked)} />
+            Only ML predictions
+          </label>
+          <div className="p-3 pt-1">
+            <div className="text-xs font-medium text-slate-700 mb-2">
+              Pending ({filteredPending.length})
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {filteredPending.slice(0, 30).map((id) => (
               <button
                 key={id}
                 onClick={() => jumpTo(id)}

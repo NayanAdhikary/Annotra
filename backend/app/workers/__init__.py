@@ -4,6 +4,13 @@ from app.config import settings
 celery_app = Celery("annotra", broker=settings.REDIS_URL, backend=settings.REDIS_URL)
 
 celery_app.conf.update(
+    imports=[
+        "app.workers.video_worker",
+        "app.workers.export_worker",
+        "app.workers.import_worker",
+        "app.workers.cleanup_worker",
+        "app.workers.inference_worker",
+    ],
     task_serializer="json",
     result_serializer="json",
     accept_content=["json"],

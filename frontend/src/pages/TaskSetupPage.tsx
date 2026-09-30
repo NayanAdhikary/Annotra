@@ -12,6 +12,9 @@ import { useAnnotationStore } from '../store/annotationStore';
 import type { Label } from '../types/annotation';
 import { ExportDrawer } from '../components/Export/ExportDrawer';
 import { ImportDrawer } from '../components/Export/ImportDrawer';
+import { PredictDialog } from '../components/ML/PredictDialog';
+import { InferenceHistory } from '../components/ML/InferenceHistory';
+import { useAuthStore } from '../store/authStore';
 
 export const TaskSetupPage: React.FC = () => {
     const { taskId } = useParams<{ taskId: string }>();
@@ -24,6 +27,9 @@ export const TaskSetupPage: React.FC = () => {
     const [isLabelManagerOpen, setIsLabelManagerOpen] = useState(false);
     const [showExport, setShowExport] = useState(false);
     const [showImport, setShowImport] = useState(false);
+    const [showPredict, setShowPredict] = useState(false);
+    const user = useAuthStore((s) => s.user);
+    const canPredict = user && ['admin', 'manager'].includes(user.role);
     
     const setTask_ = useAnnotationStore(s => s.setTask);
     const setLabels_ = useAnnotationStore(s => s.setLabels);
@@ -85,6 +91,12 @@ export const TaskSetupPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="flex gap-2">
+                        {canPredict && task?.task_type === 'image' && (
+                          <button onClick={() => setShowPredict(true)}
+                                  className="px-3 py-1.5 text-sm border border-indigo-300 text-indigo-700 rounded-md hover:bg-indigo-50">
+                            🧠 Predict
+                          </button>
+                        )}
                         <button onClick={() => setShowImport(true)}
                                 className="px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50">
                             Import dataset
@@ -214,6 +226,7 @@ export const TaskSetupPage: React.FC = () => {
                             </ul>
                         )}
                     </div>
+                    {task?.task_type === 'image' && <InferenceHistory taskId={id} />}
                 </div>
             </div>
 
@@ -235,6 +248,13 @@ export const TaskSetupPage: React.FC = () => {
                   // Refresh image list
                   imagesApi.list(id).then(setImages);
                 }}
+              />
+            )}
+            {showPredict && (
+              <PredictDialog
+                taskId={id}
+                onClose={() => setShowPredict(false)}
+                onDone={() => { imagesApi.list(id).then(setImages); }}
               />
             )}
         </div>

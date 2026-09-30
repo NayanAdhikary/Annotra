@@ -10,7 +10,7 @@ export type BrushMode = 'brush' | 'eraser';
 
 export function useBrush(imageW: number, imageH: number, labelId: number | null) {
   const [mode, setMode] = useState<BrushMode>('brush');
-  const [brushSize, setBrushSize] = useState(30);
+  const brushSize = useAnnotationStore((s) => s.brushSize);
   const [painting, setPainting] = useState(false);
   const [version, setVersion] = useState(0);
 
@@ -99,7 +99,7 @@ export function useBrush(imageW: number, imageH: number, labelId: number | null)
 
   return {
     mode, setMode,
-    brushSize, setBrushSize,
+    brushSize,
     painting, version,
     startPaint, movePaint, endPaint,
     getMask, isDirty,

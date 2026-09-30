@@ -29,6 +29,7 @@ const AdminApiKeysPage = React.lazy(() => import('./pages/admin/AdminApiKeysPage
 const AdminSettingsPage = React.lazy(() => import('./pages/AdminSettingsPage').then(m => ({ default: m.AdminSettingsPage })));
 const AdminNotificationsPage = React.lazy(() => import('./pages/admin/AdminNotificationsPage').then(m => ({ default: m.AdminNotificationsPage })));
 const AdminProjectDetailPage = React.lazy(() => import('./pages/admin/AdminProjectDetailPage').then(m => ({ default: m.AdminProjectDetailPage })));
+const AdminModelsPage = React.lazy(() => import('./pages/admin/AdminModelsPage').then(m => ({ default: m.AdminModelsPage })));
 
 const SuspenseWrapper = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<div className="p-8 text-slate-500">Loading...</div>}>
@@ -133,6 +134,11 @@ export const App: React.FC = () => {
         <Route path="/admin/health" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminLayout><SuspenseWrapper><AdminHealthPage /></SuspenseWrapper></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/models" element={
+          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+            <AdminLayout><SuspenseWrapper><AdminModelsPage /></SuspenseWrapper></AdminLayout>
           </ProtectedRoute>
         } />
 

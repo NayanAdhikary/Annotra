@@ -11,6 +11,7 @@ const NAV = [
   { to: '/admin/audit', label: 'Audit log', icon: '≡' },
   // { to: '/admin/api-keys', label: 'API keys', icon: '🔑' },
   { to: '/admin/settings', label: 'Settings', icon: '⚙' },
+  { to: '/admin/models', label: 'ML Models', icon: '🧠' },
   // { to: '/admin/notifications', label: 'Announcements', icon: '📢' },
   { to: '/admin/quality', label: 'Quality', icon: '★' },
   { to: '/admin/health', label: 'Health', icon: '✚' },

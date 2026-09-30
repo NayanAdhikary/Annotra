@@ -40,6 +40,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g \
     curl \
     tini \
+    libgl1 \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --shell /bin/bash --uid 1000 app
 

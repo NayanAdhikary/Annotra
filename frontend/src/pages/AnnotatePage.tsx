@@ -48,7 +48,7 @@ export const AnnotatePage: React.FC = () => {
     tasksApi.get(id).then((t) => {
       setTaskStatusLocal(t.status);
       setTaskStatus(t.status);
-    });
+    }).catch(e => console.error(e));
   }, [id, setTaskStatus]);
   
   const [rejectedCount, setRejectedCount] = useState(0);
@@ -148,6 +148,19 @@ export const AnnotatePage: React.FC = () => {
     );
   }
 
+  if (!taskData) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center text-center px-6">
+        <div className="text-5xl mb-4 text-slate-400">🔍</div>
+        <h2 className="text-xl font-semibold text-slate-900 mb-2">Task not found</h2>
+        <p className="text-sm text-slate-500 mb-6">The task you're looking for doesn't exist or you don't have access to it.</p>
+        <Link to="/my-tasks" className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">
+          Back to tasks
+        </Link>
+      </div>
+    );
+  }
+
   if (!images.length) {
     return (
       <div className="h-screen flex flex-col items-center justify-center text-center px-6">
@@ -198,7 +211,7 @@ export const AnnotatePage: React.FC = () => {
             </p>
           </div>
         </div>
-        <Toolbar />
+
         <div className="flex items-center gap-5">
           <HistoryControls />
           <SaveIndicator />
@@ -258,11 +271,12 @@ export const AnnotatePage: React.FC = () => {
         <div><b>Select:</b> V · Shift+click multi · Tab next · Shift+Tab prev</div>
         <div><b>Edit:</b> Ctrl+Z undo · Ctrl+C/V copy/paste</div>
         <div><b>View:</b> Scroll zoom · Space+drag pan · 0 fit · 1 100% · Shift+F zoom to selection</div>
-        <div><b>Review:</b> A accept · R reject · F fix · N next pending · Shift+A accept frame</div>
+        <div><b>Review:</b> A accept · R reject · F fix · N next pending · <span><b>Shift+A</b> accept ML predictions on frame</span></div>
       </div>
 
       {/* Main Workspace */}
       <div className="flex flex-1 overflow-hidden">
+        <Toolbar vertical />
         {/* Canvas Area */}
         <div className="flex-1 flex items-center justify-center bg-slate-100 overflow-auto p-8">
           <div

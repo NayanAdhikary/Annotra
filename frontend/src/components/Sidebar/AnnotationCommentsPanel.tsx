@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { reviewApi, AnnotationComment } from '../../api/review';
+import { reviewApi, type AnnotationComment } from '../../api/review';
 import { useAnnotationStore } from '../../store/annotationStore';
 import { useAuthStore } from '../../store/authStore';
 

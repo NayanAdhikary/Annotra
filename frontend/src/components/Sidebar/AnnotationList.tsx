@@ -117,6 +117,11 @@ export const AnnotationList: React.FC = () => {
                 <div className="text-sm font-medium truncate flex items-center gap-2">
                   {label?.name ?? 'Unlabeled'}
                   <ReviewBadge status={a.reviewStatus} />
+                  {a.source === 'auto' && (
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-purple-100 text-purple-700 font-medium ml-1">
+                      ML
+                    </span>
+                  )}
                 </div>
                 <div className="text-[10px] text-gray-500">
                   #{a.serverId ?? a.id.slice(-4)} · {a.shapeType}

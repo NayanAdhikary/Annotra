@@ -15,9 +15,30 @@ export function useReviewKeys(taskId: number, onReviewed: () => void) {
         (e.target as HTMLElement)?.tagName,
       );
       if (inInput) return;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-
+      
       const store = useAnnotationStore.getState();
+
+      if (e.shiftKey && e.key === 'A') {
+        e.preventDefault();
+        const frame = store.frame;
+        const pending = store.annotations.filter(
+          (a) => a.frame === frame
+              && a.serverId
+              && (a.reviewStatus ?? 'pending') === 'pending'
+              && a.source === 'auto',
+        );
+        if (!pending.length) return;
+        if (!window.confirm(`Accept ${pending.length} ML predictions on this frame?`)) return;
+      
+        for (const a of pending) {
+          await reviewApi.reviewOne(a.serverId!, 'accepted');
+          store.replaceAnnotation(a.id, { reviewStatus: 'accepted' });
+        }
+        onReviewed();
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const ann = store.annotations.find((a) => a.id === store.primaryId);
       if (!ann || !ann.serverId) return;
 

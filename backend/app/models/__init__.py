@@ -10,8 +10,11 @@ from app.models.task_assignment import TaskAssignment
 from app.models.export_job import ExportJob, ImportJob
 from app.models.notification import Notification
 from app.models.annotation_comment import AnnotationComment
+from app.models.ml_model import MLModel, InferenceJob
 
 __all__ = [
+    "MLModel",
+    "InferenceJob",
     "User",
     "UserRole",
     "Project",
