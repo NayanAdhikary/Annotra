@@ -1,10 +1,10 @@
-from sqlalchemy import Column, BigInteger, String, DateTime, ForeignKey, func
+from sqlalchemy import Column, BigInteger, Integer, String, DateTime, ForeignKey, func
 from app.core.database import Base
 
 class ApiKey(Base):
     __tablename__ = "api_keys"
 
-    id = Column(BigInteger, primary_key=True)
+    id = Column(Integer, primary_key=True)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(100), nullable=False)
     prefix = Column(String(20), nullable=False, index=True) #first 8 chars for display

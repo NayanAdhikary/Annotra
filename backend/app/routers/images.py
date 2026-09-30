@@ -21,7 +21,10 @@ async def _assert_can_edit_task(db: AsyncSession, task_id: int, user: User) -> T
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not your project")
     return task
 
-UPLOAD_ROOT = "/data/images"
+import sys
+
+_DATA_DIR = os.environ.get("DATA_DIR", "/data" if sys.platform != "win32" else os.path.join(os.getcwd(), "data"))
+UPLOAD_ROOT = os.path.join(_DATA_DIR, "images")
 ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 

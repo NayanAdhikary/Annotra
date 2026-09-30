@@ -19,11 +19,9 @@ interface VideoState {
   frameUrls: string[];
   frameW: number;
   frameH: number;
-
   currentFrame: number;
   playing: boolean;
   playbackRate: number;
-
   tracks: Track[];
 
   setVideo: (v: { id: number; frameUrls: string[]; w: number; h: number }) => void;
@@ -52,22 +50,22 @@ export const useVideoStore = create<VideoState>((set, get) => ({
     set({ videoId: id, frameUrls, frameW: w, frameH: h, currentFrame: 0 }),
 
   setFrame: (f) =>
-    set((s) => ({
-      currentFrame: Math.max(0, Math.min(s.frameUrls.length - 1, f)),
-    })),
+    set((s) => ({ currentFrame: Math.max(0, Math.min(s.frameUrls.length - 1, f)) })),
 
   stepFrame: (delta) => get().setFrame(get().currentFrame + delta),
 
   togglePlay: () => set((s) => ({ playing: !s.playing })),
-
   setPlaybackRate: (r) => set({ playbackRate: r }),
 
   upsertTrack: (t) =>
     set((s) => {
       const idx = s.tracks.findIndex((x) => x.trackId === t.trackId);
-      const next = idx >= 0 ? [...s.tracks] : [...s.tracks, t];
-      if (idx >= 0) next[idx] = t;
-      return { tracks: next };
+      if (idx >= 0) {
+        const next = [...s.tracks];
+        next[idx] = t;
+        return { tracks: next };
+      }
+      return { tracks: [...s.tracks, t] };
     }),
 
   addKeyframe: (trackId, kf) =>

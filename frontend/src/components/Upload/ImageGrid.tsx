@@ -1,4 +1,5 @@
 import React from 'react';
+// @ts-ignore
 import { FixedSizeGrid as Grid } from 'react-window';
 import type { ImageAsset } from '../../api/images';
 
@@ -37,7 +38,7 @@ export const ImageGrid: React.FC<Props> = ({ images, onOpen }) => {
           width={size.w}
           height={size.h || 400}
         >
-          {({ columnIndex, rowIndex, style }) => {
+          {({ columnIndex, rowIndex, style }: any) => {
             const i = rowIndex * cols + columnIndex;
             const img = images[i];
             if (!img) return null;

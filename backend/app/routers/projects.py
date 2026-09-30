@@ -53,6 +53,26 @@ async def _assert_project_access(db: AsyncSession, project_id: int, user: User) 
     return project
 
 
+async def _assert_can_read_task(db: AsyncSession, task_id: int, user: User) -> Task:
+    """Allow admins/managers OR any assigned user to read a task."""
+    task = await db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(404, "Task not found")
+    if user.role in (UserRole.ADMIN.value, UserRole.MANAGER.value):
+        return task
+    # Check if the user is assigned to this task
+    from app.models.task_assignment import TaskAssignment
+    assignment = (await db.execute(
+        select(TaskAssignment).where(
+            TaskAssignment.task_id == task_id,
+            TaskAssignment.user_id == user.id,
+        )
+    )).scalar_one_or_none()
+    if assignment is None:
+        raise HTTPException(403, "Not assigned to this task")
+    return task
+
+
 # ---------------- Projects ----------------
 
 @router.get("/projects", response_model=List[ProjectResponse])

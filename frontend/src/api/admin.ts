@@ -102,5 +102,5 @@ export const adminApi = {
   listApiKeys: async (): Promise<any[]> => (await api.get('/api/admin/api-keys')).data,
   createApiKey: async (name: string, expires_days?: number): Promise<any> => (await api.post('/api/admin/api-keys', { name, expires_days })).data,
   revokeApiKey: async (keyId: string | number): Promise<void> => (await api.delete(`/api/admin/api-keys/${keyId}`)).data,
-  analytics: async (...args: any[]): Promise<any> => (await api.get('/api/admin/analytics')).data,
+  analytics: async (...args: any[]): Promise<any> => (await api.get('/api/admin/analytics/timeseries')).data,
 };

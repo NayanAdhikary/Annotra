@@ -1,20 +1,7 @@
 from celery import Celery
 from app.config import settings
-import sentry_sdk
 
-if settings.SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        environment=settings.ENVIRONMENT,
-        release=settings.RELEASE,
-        traces_sample_rate=0.05,
-    )
-
-celery_app = Celery(
-    "annotra",
-    broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL,
-)
+celery_app = Celery("annotra", broker=settings.REDIS_URL, backend=settings.REDIS_URL)
 
 celery_app.conf.update(
     task_serializer="json",
@@ -23,23 +10,13 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_track_started=True,
-    worker_max_tasks_per_child=50,  # guards against ffmpeg leaks
-    task_always_eager=True,
-    task_eager_propagates=True,
+    worker_max_tasks_per_child=50,
     task_routes={
         "video.extract_frames": {"queue": "heavy"},
         "inference.run": {"queue": "heavy"},
         "export.build": {"queue": "medium"},
         "import.run": {"queue": "medium"},
         "cleanup.expired_exports": {"queue": "light"},
-        "notification.send_email": {"queue": "light"},
     },
     task_default_queue="medium",
 )
-
-celery_app.conf.beat_schedule = {
-    "cleanup-expired-exports": {
-        "task": "cleanup.expired_exports",
-        "schedule": 3600.0,  # hourly
-    },
-}

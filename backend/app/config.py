@@ -29,3 +29,6 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+import time
+START_TIME = time.time()
+

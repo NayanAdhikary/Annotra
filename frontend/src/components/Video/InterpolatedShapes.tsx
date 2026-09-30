@@ -5,10 +5,6 @@ import { interpolateAt } from '../../lib/interpolate';
 
 interface Props { width: number; height: number }
 
-/**
- * Renders every track's shape at the current frame. Keyframes are drawn
- * solid; interpolated shapes are drawn dashed to signal "computed, not set".
- */
 export const InterpolatedShapes: React.FC<Props> = ({ width, height }) => {
   const tracks = useVideoStore((s) => s.tracks);
   const currentFrame = useVideoStore((s) => s.currentFrame);
@@ -17,11 +13,13 @@ export const InterpolatedShapes: React.FC<Props> = ({ width, height }) => {
   const drawn = useMemo(() => {
     return tracks
       .map((t) => {
-        const a = interpolateAt(
+        const ann = interpolateAt(
           t.trackId, t.keyframes, currentFrame,
           { labelId: t.labelId, shapeType: t.shapeType },
         );
-        return a ? { annotation: a, keyframe: t.keyframes.some((k) => k.frame === currentFrame) } : null;
+        if (!ann) return null;
+        const isKey = t.keyframes.some((k) => k.frame === currentFrame);
+        return { ann, isKey };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
   }, [tracks, currentFrame]);
@@ -32,14 +30,15 @@ export const InterpolatedShapes: React.FC<Props> = ({ width, height }) => {
       width={width} height={height}
       viewBox={`0 0 ${width} ${height}`}
     >
-      {drawn.map(({ annotation: a, keyframe }) => {
-        const color = labels.find((l) => l.id === a.labelId)?.color ?? '#FF0000';
-        const dash = keyframe ? undefined : '6 4';
-        if (a.shapeType === 'rectangle') {
-          const [x1, y1, x2, y2] = a.points;
+      {drawn.map(({ ann, isKey }) => {
+        const color = labels.find((l) => l.id === ann.labelId)?.color ?? '#FF0000';
+        const dash = isKey ? undefined : '6 4';
+
+        if (ann.shapeType === 'rectangle') {
+          const [x1, y1, x2, y2] = ann.points;
           return (
             <rect
-              key={a.id}
+              key={ann.id}
               x={Math.min(x1, x2)} y={Math.min(y1, y2)}
               width={Math.abs(x2 - x1)} height={Math.abs(y2 - y1)}
               fill="none" stroke={color} strokeWidth={2}
@@ -47,29 +46,27 @@ export const InterpolatedShapes: React.FC<Props> = ({ width, height }) => {
             />
           );
         }
-        if (a.shapeType === 'polygon' || a.shapeType === 'polyline') {
 
-          const pointsStr = Array.from({ length: a.points.length / 2 })
-            .map((_, i) => `${a.points[i * 2]},${a.points[i * 2 + 1]}`)
+        if (ann.shapeType === 'polygon' || ann.shapeType === 'polyline') {
+          const pointsStr = Array.from({ length: ann.points.length / 2 })
+            .map((_, i) => `${ann.points[i * 2]},${ann.points[i * 2 + 1]}`)
             .join(' ');
           return (
             <polygon
-              key={a.id}
+              key={ann.id}
               points={pointsStr}
               fill="none" stroke={color} strokeWidth={2}
               strokeDasharray={dash}
             />
           );
         }
-        if (a.shapeType === 'points') {
+
+        if (ann.shapeType === 'points') {
           return (
-            <g key={a.id}>
-              {Array.from({ length: a.points.length / 2 }).map((_, i) => (
-                <circle
-                  key={i}
-                  cx={a.points[i * 2]} cy={a.points[i * 2 + 1]}
-                  r={5} fill={color} stroke="#000"
-                />
+            <g key={ann.id}>
+              {Array.from({ length: ann.points.length / 2 }).map((_, i) => (
+                <circle key={i} cx={ann.points[i * 2]} cy={ann.points[i * 2 + 1]}
+                        r={5} fill={color} stroke="#000" />
               ))}
             </g>
           );

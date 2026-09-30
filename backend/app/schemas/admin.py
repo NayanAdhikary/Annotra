@@ -134,7 +134,7 @@ class AdminTaskRow(BaseModel):
     project_id: int
     project_name: str
     name: str
-    task_type: str
+    task_type: str | None = None
     status: str
     image_count: int
     label_count: int

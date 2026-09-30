@@ -1,31 +1,22 @@
-import asyncio
-import os
-from datetime import datetime, timezone
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from app.workers import celery_app
+from app.config import settings
 from app.services.video import probe_video, extract_frames
 
 
 @celery_app.task(bind=True, max_retries=1, name="video.extract_frames")
 def extract_video_frames(self, video_id: int):
-    """
-    Extract frames from a video asset. Uses a synchronous DB session because
-    Celery workers are sync by default. Keep the async boundary at the API
-    layer, not inside the worker.
-    """
-    from sqlalchemy import create_engine, select, update
-    from sqlalchemy.orm import Session
-    from app.config import settings
     from app.models.video import VideoAsset
 
-    # Convert asyncpg/aiosqlite DSN to synchronous
-    sync_dsn = settings.DATABASE_URL.replace("+asyncpg", "").replace("+aiosqlite", "")
-
+    sync_dsn = settings.DATABASE_URL.replace("+asyncpg", "")
     engine = create_engine(sync_dsn)
+
     with Session(engine) as db:
         video = db.get(VideoAsset, video_id)
         if video is None:
-            return {"error": "video not found"}
+            return {"error": "not found"}
 
         video.extraction_status = "running"
         video.extraction_job_id = self.request.id
@@ -51,6 +42,7 @@ def extract_video_frames(self, video_id: int):
             video.extraction_error = None
             db.commit()
             return {"video_id": video_id, "frames": count}
+
         except Exception as e:
             video.extraction_status = "failed"
             video.extraction_error = str(e)[:1000]

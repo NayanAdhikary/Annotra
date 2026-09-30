@@ -1,7 +1,7 @@
 import json
 import os
-import subprocess
 import shutil
+import subprocess
 from dataclasses import dataclass
 
 
@@ -15,10 +15,6 @@ class VideoMetadata:
 
 
 def probe_video(path: str) -> VideoMetadata:
-    """
-    Use ffprobe to read video metadata. Raises if ffprobe is missing or the
-    file is not a valid video.
-    """
     if not shutil.which("ffprobe"):
         raise RuntimeError("ffprobe not installed")
 
@@ -36,7 +32,6 @@ def probe_video(path: str) -> VideoMetadata:
     width = int(stream.get("width", 0))
     height = int(stream.get("height", 0))
 
-    # r_frame_rate is like "30000/1001"
     rate = stream.get("r_frame_rate", "0/1")
     try:
         num, den = rate.split("/")
@@ -45,20 +40,10 @@ def probe_video(path: str) -> VideoMetadata:
         fps = 0.0
 
     duration = float(stream.get("duration", 0))
-    nb_frames = stream.get("nb_frames")
+    nb = stream.get("nb_frames")
+    total_frames = int(nb) if nb and nb.isdigit() else (int(duration * fps) if fps else 0)
 
-    if nb_frames and nb_frames.isdigit():
-        total_frames = int(nb_frames)
-    else:
-        total_frames = int(duration * fps) if fps else 0
-
-    return VideoMetadata(
-        duration_sec=duration,
-        fps=fps,
-        total_frames=total_frames,
-        width=width,
-        height=height,
-    )
+    return VideoMetadata(duration, fps, total_frames, width, height)
 
 
 def extract_frames(
@@ -66,18 +51,11 @@ def extract_frames(
     output_dir: str,
     fps: float | None = None,
     jpeg_quality: int = 3,
-    progress_callback=None,
 ) -> int:
     """
-    Extract frames as JPEGs into output_dir. If fps is None, use the source fps
-    (one JPEG per source frame). Otherwise sample at `fps` FPS.
-
-    Returns the number of frames written.
-
-    The extraction writes to a temp dir first, then atomically renames, so a
-    crash mid-extraction leaves no partial state.
+    Extract frames as JPEGs. Atomic — writes to a tmp dir first, renames on success.
     """
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(output_dir), exist_ok=True)
     tmp_dir = output_dir + ".tmp"
     if os.path.exists(tmp_dir):
         shutil.rmtree(tmp_dir)
@@ -91,15 +69,14 @@ def extract_frames(
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
     )
-    for line in proc.stdout or []:
-        if progress_callback:
-            progress_callback(line)
+    for _ in proc.stdout or []:
+        pass
     proc.wait()
+
     if proc.returncode != 0:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        raise RuntimeError(f"ffmpeg failed with code {proc.returncode}")
+        raise RuntimeError(f"ffmpeg exited with {proc.returncode}")
 
-    # Atomic swap
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
     os.rename(tmp_dir, output_dir)

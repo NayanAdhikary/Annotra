@@ -24,8 +24,11 @@ from app.services.importers import (
 from app.workers.export_worker import build_export
 from app.workers.import_worker import run_import
 
+import sys as _sys
+
 router = APIRouter()
-IMPORT_ROOT = "/data/imports"
+_DATA_DIR = os.environ.get("DATA_DIR", "/data" if _sys.platform != "win32" else os.path.join(os.getcwd(), "data"))
+IMPORT_ROOT = os.path.join(_DATA_DIR, "imports")
 
 
 async def _task_guard(db: AsyncSession, task_id: int, user: User) -> Task:

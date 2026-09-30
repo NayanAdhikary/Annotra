@@ -1,10 +1,10 @@
-from sqlalchemy import Column, BigInteger, String, DateTime, ForeignKey, func, Boolean
+from sqlalchemy import Column, BigInteger, Integer, String, DateTime, ForeignKey, func, Boolean
 from app.core.database import Base
 
 class AdminNotification(Base):
     __tablename__ = "admin_notifications"
 
-    id = Column(BigInteger, primary_key=True)
+    id = Column(Integer, primary_key=True)
     title = Column(String(200), nullable=False)
     message = Column(String(2000), nullable=False)
     severity = Column(String(20), default="info")

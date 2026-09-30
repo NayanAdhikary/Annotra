@@ -8,7 +8,6 @@ from app.routers import auth, projects, tasks, annotations, labels, images, admi
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
 
-_START_TIME = time.time()
 app = FastAPI(title="Annotra API", version="0.1.0")
 
 class TimingMiddleware(BaseHTTPMiddleware):
@@ -52,7 +51,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-os.makedirs("/data/images", exist_ok=True)
+import sys
+
+# Use /data in production (Linux/Docker), fall back to ./data in dev (Windows)
+DATA_DIR = os.environ.get("DATA_DIR", "/data" if sys.platform != "win32" else os.path.join(os.getcwd(), "data"))
+
+os.makedirs(os.path.join(DATA_DIR, "images"), exist_ok=True)
 os.makedirs("/data/videos", exist_ok=True)
 os.makedirs("/data/frames", exist_ok=True)
 
@@ -63,7 +67,7 @@ class CachedStaticFiles(StaticFiles):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         return response
 
-app.mount("/static/images", CachedStaticFiles(directory="/data/images"), name="images")
+app.mount("/static/images", CachedStaticFiles(directory=os.path.join(DATA_DIR, "images")), name="images")
 app.mount("/static/videos", CachedStaticFiles(directory="/data/videos"), name="videos")
 app.mount("/static/frames", CachedStaticFiles(directory="/data/frames"), name="frames")
 
@@ -76,8 +80,8 @@ app.include_router(images.router, prefix="/api", tags=["images"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(exports.router, prefix="/api", tags=["exports"])
 
-os.makedirs("/data/exports", exist_ok=True)
-os.makedirs("/data/imports", exist_ok=True)
+os.makedirs(os.path.join(DATA_DIR, "exports"), exist_ok=True)
+os.makedirs(os.path.join(DATA_DIR, "imports"), exist_ok=True)
 app.include_router(announcements.router, prefix="/api", tags=["announcements"])
 app.include_router(videos.router, prefix="/api", tags=["videos"])
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])

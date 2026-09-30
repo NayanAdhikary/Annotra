@@ -1,11 +1,11 @@
-from sqlalchemy import Column, BigInteger, String, ForeignKey, DateTime, func, Boolean, Text
+from sqlalchemy import Column, BigInteger, Integer, String, ForeignKey, DateTime, func, Boolean, Text
 from app.core.database import Base
 
 
 class Notification(Base):
     __tablename__ = "notifications"
 
-    id = Column(BigInteger, primary_key=True)
+    id = Column(Integer, primary_key=True)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     kind = Column(String(50), nullable=False, index=True)
     #"task_assigned" | "task_submitted_for_review" | "review_completed" | "task_rejected"

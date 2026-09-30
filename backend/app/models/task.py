@@ -22,7 +22,7 @@ class Task(Base):
     project_id    = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"),
                            nullable=False, index=True)
     name          = Column(String(255), nullable=False)
-    task_type     = Column(String(20), default="image")  # "image" | "video"
+    task_type     = Column(String(20), default="image", nullable=False)  # "image" | "video"
     status        = Column(String(20), default="annotation", nullable=False, index=True)
     # "annotation" | "review" | "completed" | "archived"
 

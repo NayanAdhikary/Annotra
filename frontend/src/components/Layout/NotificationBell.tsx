@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { notificationsApi, NotificationItem } from '../../api/notifications';
+import { notificationsApi, type NotificationItem } from '../../api/notifications';
 
 const ICONS: Record<string, string> = {
   task_assigned: '📌',

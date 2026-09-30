@@ -398,7 +398,7 @@ import asyncio
 from sqlalchemy import text
 import psutil
 import time
-from app.main import _START_TIME
+from app.config import START_TIME
 
 @router.get("/health")
 async def health(db: AsyncSession = Depends(get_db), _: User = ADMIN_ONLY):
@@ -427,8 +427,9 @@ async def health(db: AsyncSession = Depends(get_db), _: User = ADMIN_ONLY):
         "overflow": pool.overflow(),
     }
 
-    # Disk usage
-    disk = psutil.disk_usage("/data")
+    # Disk usage — use /data if it exists, otherwise fall back to CWD (Windows dev)
+    _disk_path = "/data" if os.path.exists("/data") else "."
+    disk = psutil.disk_usage(_disk_path)
 
     celery_workers = 0
     try:
@@ -449,7 +450,7 @@ async def health(db: AsyncSession = Depends(get_db), _: User = ADMIN_ONLY):
             "free_gb": round(disk.free / 1e9, 2),
             "percent": disk.percent,
         },
-        "uptime_sec": int(time.time() - _START_TIME),
+        "uptime_sec": int(time.time() - START_TIME),
     }
 
 
@@ -1112,7 +1113,7 @@ async def delete_notification(
 
 # ---------------- Impersonation ----------------
 
-@router.post("/impersonate/{user_id}", response_model=ImpersonateResponse)
+@router.post("/users/{user_id}/impersonate", response_model=ImpersonateResponse)
 async def impersonate(
     user_id: int, request: Request,
     db: AsyncSession = Depends(get_db), admin: User = ADMIN_ONLY,
@@ -1246,8 +1247,11 @@ import os, uuid, io
 from PIL import Image as PILImage
 
 
+import sys as _sys
+_DATA_DIR_ADMIN = os.environ.get("DATA_DIR", "/data" if _sys.platform != "win32" else os.path.join(os.getcwd(), "data"))
+
 ALLOWED_IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-UPLOAD_ROOT = "/data/images"
+UPLOAD_ROOT = os.path.join(_DATA_DIR_ADMIN, "images")
 
 
 @router.post("/tasks/{task_id}/images/bulk")
@@ -1332,7 +1336,7 @@ async def bulk_upload_videos(
     from app.models.video import VideoAsset
     from app.workers.video_worker import extract_video_frames
 
-    video_root = "/data/videos"
+    video_root = os.path.join(_DATA_DIR_ADMIN, "videos")
     os.makedirs(os.path.join(video_root, str(task_id)), exist_ok=True)
 
     created = []
