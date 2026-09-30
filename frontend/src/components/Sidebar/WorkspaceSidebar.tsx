@@ -5,6 +5,7 @@ import type { Comment } from '../../api/tasks';
 import { AnnotationList } from './AnnotationList';
 import { TaskComments } from '../Tasks/TaskComments';
 import { RectInspector } from '../Inspector/RectInspector';
+import { AttributePanel } from '../Inspector/AttributePannel';
 
 type Tab = 'objects' | 'comments';
 
@@ -49,6 +50,7 @@ export const WorkspaceSidebar: React.FC<{ taskId: number }> = ({ taskId }) => {
       {tab === 'objects' ? (
         <>
           <RectInspector />
+          <AttributePanel />
           <AnnotationList />
         </>
       ) : (

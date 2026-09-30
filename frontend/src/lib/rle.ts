@@ -1,13 +1,10 @@
 /**
  * COCO-style RLE. Encodes a binary mask (Uint8Array of h*w) into an
- * array of run-lengths, starting with the count of zeros.
- *
- * Example: [0,0,1,1,1,0] → counts=[2,3,1], size=[h,w]
+ * array of run lengths, starting with the count of zeros.
  */
-
 export interface RLE {
   counts: number[];
-  size: [number, number]; // [height, width]
+  size: [number, number];  // [height, width]
 }
 
 export function encodeRLE(mask: Uint8Array, width: number, height: number): RLE {
@@ -39,16 +36,4 @@ export function decodeRLE(rle: RLE): Uint8Array {
     value = 1 - value;
   }
   return out;
-}
-
-export function rleArea(rle: RLE): number {
-  let idx = 0;
-  let value = 0;
-  let area = 0;
-  for (const run of rle.counts) {
-    if (value) area += run;
-    idx += run;
-    value = 1 - value;
-  }
-  return area;
 }

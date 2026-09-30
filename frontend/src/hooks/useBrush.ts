@@ -1,47 +1,24 @@
 import { useCallback, useRef, useState } from 'react';
-import { useAnnotationStore } from '../store/annotationStore';
-import { makeLocalId } from '../store/annotationStore';
+import { useAnnotationStore, makeLocalId } from '../store/annotationStore';
 import { encodeRLE } from '../lib/rle';
 import type { Annotation } from '../types/annotation';
+import { annotationsApi } from '../api/annotations';
+import { useHistoryStore } from '../store/historyStore';
+import { AddAnnotationCommand } from '../commands/AnnotationCommands';
 
 export type BrushMode = 'brush' | 'eraser';
 
-/**
- * Manages an in-progress mask painting session.
- *
- * The user drags the brush over the canvas. We maintain a
- * Uint8Array bitmap the size of the image, mark pixels as we go,
- * and on mouseup we encode to RLE and commit as an annotation.
- *
- * During painting, we render a live canvas overlay (not per-pixel React).
- */
-export function useBrush(
-  imageW: number,
-  imageH: number,
-  labelId: number | null,
-) {
-  const addLocal = useAnnotationStore((s) => s.addLocal);
+export function useBrush(imageW: number, imageH: number, labelId: number | null) {
   const [mode, setMode] = useState<BrushMode>('brush');
-  const [brushSize, setBrushSize] = useState(30);  // in image pixels
+  const [brushSize, setBrushSize] = useState(30);
   const [painting, setPainting] = useState(false);
-
-  // Current mask bitmap — a live working buffer
-  const maskRef = useRef<Uint8Array | null>(null);
-  // Track if we've modified anything this session
-  const dirtyRef = useRef(false);
-  // Incrementing counter forces React to re-render the canvas overlay
   const [version, setVersion] = useState(0);
 
-  const reset = useCallback(() => {
-    maskRef.current = new Uint8Array(imageW * imageH);
-    dirtyRef.current = false;
-    setVersion((v) => v + 1);
-  }, [imageW, imageH]);
+  const maskRef = useRef<Uint8Array | null>(null);
+  const dirtyRef = useRef(false);
 
   const paintAt = useCallback((imgX: number, imgY: number) => {
-    if (!maskRef.current) {
-      maskRef.current = new Uint8Array(imageW * imageH);
-    }
+    if (!maskRef.current) maskRef.current = new Uint8Array(imageW * imageH);
     const mask = maskRef.current;
     const r = brushSize / 2;
     const r2 = r * r;
@@ -55,9 +32,7 @@ export function useBrush(
       for (let x = x0; x <= x1; x++) {
         const dx = x - imgX;
         const dy = y - imgY;
-        if (dx * dx + dy * dy <= r2) {
-          mask[y * imageW + x] = target;
-        }
+        if (dx * dx + dy * dy <= r2) mask[y * imageW + x] = target;
       }
     }
     dirtyRef.current = true;
@@ -78,29 +53,46 @@ export function useBrush(
   const endPaint = useCallback(async () => {
     if (!painting) return;
     setPainting(false);
-    if (!dirtyRef.current || !maskRef.current) return;
-    if (labelId === null) return;
+    if (!dirtyRef.current || !maskRef.current || labelId === null) return;
 
     const rle = encodeRLE(maskRef.current, imageW, imageH);
-    const maskAnnotation: Annotation = {
+    const ann: Annotation = {
       id: makeLocalId(),
       taskId: useAnnotationStore.getState().taskId ?? -1,
       frame: useAnnotationStore.getState().frame,
       labelId,
-      shapeType: 'mask' as any,
-      // We store RLE inside points as a JSON-stringified object; the backend
-      // schema accepts any array but the frontend marks mask as a special case.
+      shapeType: 'mask',
       points: [JSON.stringify(rle)] as any,
       occluded: false,
       source: 'manual',
       groupId: 0,
     };
-    addLocal(maskAnnotation);
-    // Clear the working mask so the next stroke starts fresh
+    
+    useHistoryStore.getState().execute(new AddAnnotationCommand(ann));
+
+    const taskId = useAnnotationStore.getState().taskId;
+    if (taskId) {
+      try {
+        const server = await annotationsApi.create(taskId, {
+          label_id: labelId,
+          shape_type: 'mask',
+          points: [JSON.stringify(rle)] as any,
+          frame: useAnnotationStore.getState().frame,
+        });
+        useAnnotationStore.getState().attachServerId(ann.id, server.id);
+      } catch (e) {
+        console.error('mask persist failed', e);
+        // Rollback on server failure to keep state synced
+        useHistoryStore.getState().undo();
+        useHistoryStore.setState({ future: [] });
+      }
+    }
+
+    // Reset for the next stroke
     maskRef.current = new Uint8Array(imageW * imageH);
     dirtyRef.current = false;
     setVersion((v) => v + 1);
-  }, [painting, labelId, imageW, imageH, addLocal]);
+  }, [painting, labelId, imageW, imageH]);
 
   const getMask = useCallback(() => maskRef.current, []);
   const isDirty = useCallback(() => dirtyRef.current, []);
@@ -110,6 +102,6 @@ export function useBrush(
     brushSize, setBrushSize,
     painting, version,
     startPaint, movePaint, endPaint,
-    reset, getMask, isDirty,
+    getMask, isDirty,
   };
 }

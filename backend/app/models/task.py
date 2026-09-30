@@ -67,12 +67,13 @@ class TaskComment(Base):
 
 class Label(Base):
     __tablename__ = "labels"
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
-    name = Column(String(100), nullable=False)
-    color = Column(String(7), default="#FF0000")
-    attributes = Column(JSON, default=list, nullable=False)
+
+    id          = Column(BigInteger, primary_key=True)
+    task_id     = Column(BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+    name        = Column(String(100), nullable=False)
+    color       = Column(String(7), default="#FF0000")
+    attributes  = Column(JSON, default=list, nullable=False)
 
     task = relationship("Task", back_populates="labels")
 

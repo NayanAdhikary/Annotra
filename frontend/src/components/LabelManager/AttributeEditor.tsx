@@ -49,8 +49,7 @@ export const AttributeEditor: React.FC<Props> = ({ attributes, onChange }) => {
             >
               {INPUT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
-            <button onClick={() => remove(i)}
-                    className="text-slate-400 hover:text-red-600 px-1">✕</button>
+            <button onClick={() => remove(i)} className="text-slate-400 hover:text-red-600 px-1">✕</button>
           </div>
 
           {(a.input_type === 'select' || a.input_type === 'radio') && (
@@ -85,9 +84,7 @@ export const AttributeEditor: React.FC<Props> = ({ attributes, onChange }) => {
           </div>
         </div>
       ))}
-
-      <button onClick={add}
-              className="text-xs text-indigo-600 hover:underline">
+      <button onClick={add} className="text-xs text-indigo-600 hover:underline">
         + Add attribute
       </button>
     </div>

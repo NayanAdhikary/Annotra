@@ -9,7 +9,7 @@ VALID_INPUT_TYPES = {"select", "radio", "checkbox", "text", "number"}
 class AttributeDef(BaseModel):
     name: str = Field(min_length=1, max_length=50, pattern=r"^[a-zA-Z_][a-zA-Z0-9_]*$")
     input_type: str
-    values: Optional[List[str]] = None          # only for select / radio
+    values: Optional[List[str]] = None
     default: Any = None
     required: bool = False
 
@@ -24,9 +24,8 @@ class AttributeDef(BaseModel):
     @classmethod
     def check_values(cls, v, info):
         itype = info.data.get("input_type")
-        if itype in ("select", "radio"):
-            if not v:
-                raise ValueError(f"input_type '{itype}' requires values")
+        if itype in ("select", "radio") and not v:
+            raise ValueError(f"'{itype}' requires a values list")
         return v
 
 
