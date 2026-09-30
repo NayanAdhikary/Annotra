@@ -3,32 +3,29 @@ import os
 import shutil
 import uuid
 import zipfile
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.models.task import Task, Label
 from app.models.export_job import ExportJob, ImportJob
 from app.schemas.export import (
-    ExportRequest, ExportJobResponse, ImportRequest, ImportJobResponse,
-    DetectImportRequest, DetectImportResponse,
+    ExportRequest, ExportJobResponse, ImportJobResponse, DetectImportResponse,
 )
 from app.services.audit import audit
 from app.services.importers import (
     parse_coco, parse_yolo, parse_voc, parse_cvat, detect_format,
 )
+from app.services.exporters import EXPORTERS
 from app.workers.export_worker import build_export
 from app.workers.import_worker import run_import
 
-import sys as _sys
-
 router = APIRouter()
-_DATA_DIR = os.environ.get("DATA_DIR", "/data" if _sys.platform != "win32" else os.path.join(os.getcwd(), "data"))
-IMPORT_ROOT = os.path.join(_DATA_DIR, "imports")
+IMPORT_ROOT = "/data/imports"
 
 
 async def _task_guard(db: AsyncSession, task_id: int, user: User) -> Task:
@@ -49,7 +46,6 @@ async def start_export(
 ):
     await _task_guard(db, task_id, user)
 
-    from app.services.exporters import EXPORTERS
     if payload.format not in EXPORTERS:
         raise HTTPException(422, f"Unsupported format: {payload.format}")
 
@@ -70,7 +66,7 @@ async def start_export(
     await db.refresh(job)
 
     build_export.delay(job.id)
-    return ExportJobResponse.model_validate(job)
+    return job
 
 
 @router.get("/export-jobs/{job_id}", response_model=ExportJobResponse)
@@ -81,7 +77,7 @@ async def get_export_job(
     job = await db.get(ExportJob, job_id)
     if job is None:
         raise HTTPException(404, "Job not found")
-    return ExportJobResponse.model_validate(job)
+    return job
 
 
 @router.get("/export-jobs/{job_id}/download")
@@ -98,11 +94,7 @@ async def download_export(
         raise HTTPException(410, "File has expired")
 
     fname = f"task-{job.task_id}-{job.format}.zip"
-    return FileResponse(
-        job.file_path,
-        media_type="application/zip",
-        filename=fname,
-    )
+    return FileResponse(job.file_path, media_type="application/zip", filename=fname)
 
 
 @router.get("/tasks/{task_id}/export-jobs", response_model=list[ExportJobResponse])
@@ -114,7 +106,7 @@ async def list_export_jobs(
         select(ExportJob).where(ExportJob.task_id == task_id)
         .order_by(ExportJob.created_at.desc()).limit(50)
     )).scalars().all()
-    return [ExportJobResponse.model_validate(r) for r in rows]
+    return rows
 
 
 # ---------------- Import ----------------
@@ -127,11 +119,6 @@ async def detect_import(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """
-    Upload an archive, extract to a temp dir, return detected format and
-    external labels without importing anything. Used by the frontend to
-    drive the label-mapping UI.
-    """
     await _task_guard(db, task_id, user)
 
     tmp = os.path.join(IMPORT_ROOT, f"detect-{uuid.uuid4().hex}")
@@ -178,17 +165,16 @@ async def detect_import(
              response_model=ImportJobResponse, status_code=201)
 async def start_import(
     task_id: int,
-    format: str,
-    label_mapping: str,        # JSON string
-    as_preannotations: bool,
-    request: Request,
+    format: str = Form(...),
+    label_mapping: str = Form("{}"),
+    as_preannotations: bool = Form(False),
+    request: Request = None,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     await _task_guard(db, task_id, user)
 
-    # Persist the uploaded archive
     job_dir = os.path.join(IMPORT_ROOT, uuid.uuid4().hex)
     os.makedirs(job_dir, exist_ok=True)
     archive = os.path.join(job_dir, "upload.zip")
@@ -223,7 +209,7 @@ async def start_import(
     await db.refresh(job)
 
     run_import.delay(job.id)
-    return ImportJobResponse.model_validate(job)
+    return job
 
 
 @router.get("/import-jobs/{job_id}", response_model=ImportJobResponse)

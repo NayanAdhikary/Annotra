@@ -4,7 +4,7 @@ from datetime import datetime
 
 
 class ExportRequest(BaseModel):
-    format: str       # "coco" | "yolo" | "voc" | "cvat"
+    format: str
     include_images: bool = True
 
 
@@ -24,12 +24,6 @@ class ExportJobResponse(BaseModel):
         from_attributes = True
 
 
-class ImportRequest(BaseModel):
-    format: Optional[str] = None         # auto-detected if omitted
-    label_mapping: dict = {}             # {"external_name": task_label_id}
-    as_preannotations: bool = False
-
-
 class ImportJobResponse(BaseModel):
     id: int
     task_id: int
@@ -43,11 +37,6 @@ class ImportJobResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class DetectImportRequest(BaseModel):
-    """Preview unknown labels in a dataset before import."""
-    format: Optional[str] = None
 
 
 class DetectImportResponse(BaseModel):

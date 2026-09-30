@@ -70,18 +70,12 @@ export const exportsApi = {
   ): Promise<ImportJob> => {
     const fd = new FormData();
     fd.append('file', file);
-    return (await api.post(
-      `/api/tasks/${taskId}/import`,
-      fd,
-      {
-        params: {
-          format,
-          label_mapping: JSON.stringify(labelMapping),
-          as_preannotations: asPreannotations,
-        },
-        headers: { 'Content-Type': 'multipart/form-data' },
-      },
-    )).data;
+    fd.append('format', format);
+    fd.append('label_mapping', JSON.stringify(labelMapping));
+    fd.append('as_preannotations', String(asPreannotations));
+    return (await api.post(`/api/tasks/${taskId}/import`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })).data;
   },
 
   getImport: async (jobId: number): Promise<ImportJob> =>

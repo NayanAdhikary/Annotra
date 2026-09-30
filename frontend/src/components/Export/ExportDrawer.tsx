@@ -3,11 +3,11 @@ import { exportsApi } from '../../api/exports';
 import type { ExportJob, ExportFormat } from '../../api/exports';
 import { useAuthStore } from '../../store/authStore';
 
-const FORMATS: { key: ExportFormat; label: string; hint: string }[] = [
-  { key: 'coco', label: 'COCO JSON', hint: 'Standard for detection & segmentation' },
-  { key: 'yolo', label: 'YOLO txt', hint: 'Darknet format — one txt per image' },
-  { key: 'voc', label: 'Pascal VOC', hint: 'XML per image (2007 layout)' },
-  { key: 'cvat', label: 'CVAT XML 1.1', hint: 'Round-trips with CVAT' },
+const FORMATS: { key: ExportFormat; label: string; hint: string; video: boolean }[] = [
+  { key: 'coco', label: 'COCO JSON', hint: 'Standard for detection & segmentation', video: false },
+  { key: 'yolo', label: 'YOLO txt', hint: 'Darknet format — one txt per image', video: false },
+  { key: 'voc', label: 'Pascal VOC', hint: 'XML per image (2007 layout)', video: false },
+  { key: 'cvat', label: 'CVAT XML 1.1', hint: 'Round-trips with CVAT. Supports video.', video: true },
 ];
 
 const fmtBytes = (b: number | null) => {
@@ -18,17 +18,23 @@ const fmtBytes = (b: number | null) => {
   return `${(b / 1024 ** 3).toFixed(2)} GB`;
 };
 
-export const ExportDrawer: React.FC<{ taskId: number; onClose: () => void }> = ({
-  taskId, onClose,
+export const ExportDrawer: React.FC<{ taskId: number; taskType: string; onClose: () => void }> = ({
+  taskId, taskType, onClose,
 }) => {
   const token = useAuthStore((s) => s.accessToken);
-  const [format, setFormat] = useState<ExportFormat>('coco');
+  const [format, setFormat] = useState<ExportFormat>(taskType === 'video' ? 'cvat' : 'coco');
   const [includeImages, setIncludeImages] = useState(true);
   const [busy, setBusy] = useState(false);
   const [jobs, setJobs] = useState<ExportJob[]>([]);
 
   const refresh = () => exportsApi.listExports(taskId).then(setJobs);
   useEffect(() => { refresh(); }, [taskId]);
+
+  useEffect(() => {
+    if (taskType === 'video' && format !== 'cvat') {
+      setFormat('cvat');
+    }
+  }, [taskType, format]);
 
   // Poll any in-progress jobs
   useEffect(() => {
@@ -70,19 +76,29 @@ export const ExportDrawer: React.FC<{ taskId: number; onClose: () => void }> = (
         </div>
 
         <div className="p-4 space-y-3 border-b">
+          {taskType === 'video' && (
+            <div className="bg-amber-50 text-amber-800 text-sm p-3 rounded-md border border-amber-200">
+              Video tasks can only be exported as CVAT XML.
+            </div>
+          )}
+
           <div className="text-xs font-medium text-slate-500">Format</div>
           <div className="grid grid-cols-2 gap-2">
-            {FORMATS.map((f) => (
-              <button key={f.key} onClick={() => setFormat(f.key)}
-                      className={`text-left p-3 rounded-lg border ${
-                        format === f.key
-                          ? 'border-indigo-500 bg-indigo-50'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}>
-                <div className="text-sm font-medium">{f.label}</div>
-                <div className="text-xs text-slate-500 mt-0.5">{f.hint}</div>
-              </button>
-            ))}
+            {FORMATS.map((f) => {
+              const disabled = taskType === 'video' && !f.video;
+              return (
+                <button key={f.key} onClick={() => !disabled && setFormat(f.key)}
+                        disabled={disabled}
+                        className={`text-left p-3 rounded-lg border ${
+                          format === f.key
+                            ? 'border-indigo-500 bg-indigo-50'
+                            : 'border-slate-200 hover:border-slate-300'
+                        } ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''}`}>
+                  <div className="text-sm font-medium">{f.label}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{f.hint}</div>
+                </button>
+              );
+            })}
           </div>
 
           <label className="flex items-center gap-2 text-sm pt-2">

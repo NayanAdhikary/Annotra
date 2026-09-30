@@ -6,10 +6,12 @@ from datetime import datetime, timezone
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
+
 from app.workers import celery_app
 from app.config import settings
 
 UPLOAD_ROOT = "/data/imports"
+os.makedirs(UPLOAD_ROOT, exist_ok=True)
 
 
 @celery_app.task(bind=True, name="import.run", max_retries=0)
@@ -18,7 +20,7 @@ def run_import(self, job_id: int):
     from app.models.task import Task, Label, ImageAsset
     from app.models.annotation import Annotation
     from app.services.importers import (
-        parse_coco, parse_yolo, parse_voc, parse_cvat, detect_format,
+        parse_coco, parse_yolo, parse_voc, parse_cvat,
     )
 
     sync_dsn = settings.DATABASE_URL.replace("+asyncpg", "")
@@ -71,11 +73,7 @@ def run_import(self, job_id: int):
                     select(Label).where(Label.task_id == job.task_id)
                 ).scalars()
             }
-            mapping = json.loads(job.label_mapping or "{}")
-            # mapping: {"external_name": task_label_id | null}
-
-            # Create unknown labels if the caller asked us to (optional policy)
-            # For now: skip unknown labels unless mapping specifies an id.
+            mapping: dict = json.loads(job.label_mapping or "{}")
 
             # Map filenames to image assets
             image_by_name = {
@@ -88,9 +86,8 @@ def run_import(self, job_id: int):
             imported = 0
             skipped = 0
             unknown_labels: set[str] = set()
-
-            pending_rows = []
-            BATCH_SIZE = 1000
+            pending = []
+            BATCH = 1000
 
             for a in ds.annotations:
                 task_label_id = mapping.get(a.external_label)
@@ -103,15 +100,16 @@ def run_import(self, job_id: int):
 
                 image_id = image_by_name.get(a.filename)
                 if image_id is None:
+                    basename = os.path.basename(a.filename)
                     for k, v in image_by_name.items():
-                        if os.path.basename(k) == os.path.basename(a.filename):
+                        if os.path.basename(k) == basename:
                             image_id = v
                             break
                 if image_id is None:
                     skipped += 1
                     continue
 
-                pending_rows.append({
+                pending.append({
                     "task_id": job.task_id,
                     "image_id": image_id,
                     "label_id": task_label_id,
@@ -125,19 +123,18 @@ def run_import(self, job_id: int):
                     "is_keyframe": True,
                     "created_by": job.user_id,
                 })
-                
-                if len(pending_rows) >= BATCH_SIZE:
-                    db.bulk_insert_mappings(Annotation, pending_rows)
+                imported += 1
+
+                if len(pending) >= BATCH:
+                    db.bulk_insert_mappings(Annotation, pending)
                     db.commit()
-                    imported += len(pending_rows)
-                    pending_rows = []
+                    pending = []
                     job.progress = f"Imported {imported}"
                     db.commit()
 
-            if pending_rows:
-                db.bulk_insert_mappings(Annotation, pending_rows)
+            if pending:
+                db.bulk_insert_mappings(Annotation, pending)
                 db.commit()
-                imported += len(pending_rows)
 
             job.status = "done"
             job.progress = None

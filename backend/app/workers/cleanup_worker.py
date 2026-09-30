@@ -1,7 +1,9 @@
 import os
 from datetime import datetime, timezone
+
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
+
 from app.workers import celery_app
 from app.config import settings
 
@@ -18,7 +20,7 @@ def cleanup_expired_exports():
         expired = db.execute(
             select(ExportJob).where(
                 ExportJob.status == "done",
-                ExportJob.expires_at != None,   # noqa
+                ExportJob.expires_at.is_not(None),
                 ExportJob.expires_at < now,
             )
         ).scalars().all()

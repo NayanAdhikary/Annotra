@@ -6,10 +6,12 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
+
 from app.workers import celery_app
 from app.config import settings
 
 EXPORT_ROOT = "/data/exports"
+os.makedirs(EXPORT_ROOT, exist_ok=True)
 
 
 @celery_app.task(bind=True, name="export.build", max_retries=1)
@@ -29,7 +31,7 @@ def build_export(self, job_id: int):
             return {"error": "job not found"}
 
         job.status = "running"
-        job.progress = "Loading task"
+        job.progress = "Loading data"
         db.commit()
 
         try:
@@ -38,6 +40,7 @@ def build_export(self, job_id: int):
                 {"id": l.id, "name": l.name, "color": l.color}
                 for l in db.execute(select(Label).where(Label.task_id == job.task_id)).scalars()
             ]
+
             images = [
                 {
                     "id": i.id, "filename": i.filename,
@@ -49,70 +52,81 @@ def build_export(self, job_id: int):
                 ).scalars()
             ]
 
-            # Video frames: if the task is a video task, export the frames as pseudo-images.
-            if not images and task.task_type == "video":
-                videos = db.execute(
+            videos = [
+                {
+                    "id": v.id, "filename": v.filename,
+                    "fps": v.fps, "frames_dir": v.frames_dir,
+                    "width": v.width, "height": v.height,
+                }
+                for v in db.execute(
                     select(VideoAsset).where(VideoAsset.task_id == job.task_id)
-                ).scalars().all()
+                ).scalars()
+            ]
+
+            # For video tasks: expand frame directories into pseudo-images
+            if task.task_type == "video" and videos:
                 for v in videos:
-                    if v.extraction_status != "done":
+                    if not os.path.isdir(v["frames_dir"]):
                         continue
                     frame_files = sorted(
-                        f for f in os.listdir(v.frames_dir) if f.endswith(".jpg")
+                        f for f in os.listdir(v["frames_dir"]) if f.endswith(".jpg")
                     )
                     for idx, fn in enumerate(frame_files):
                         images.append({
-                            "id": v.id * 1_000_000 + idx,  # synthetic id
+                            "id": v["id"] * 1_000_000 + idx,
                             "filename": fn,
-                            "width": v.width, "height": v.height,
-                            "storage_path": os.path.join(v.frames_dir, fn),
+                            "width": v["width"],
+                            "height": v["height"],
+                            "storage_path": os.path.join(v["frames_dir"], fn),
                             "frame": idx,
                         })
 
-            anns = []
-            after_id = 0
-            while True:
-                batch = db.execute(
-                    select(Annotation)
-                    .where(Annotation.task_id == job.task_id, Annotation.id > after_id)
-                    .order_by(Annotation.id)
-                    .limit(5000)
-                ).scalars().all()
-                if not batch:
-                    break
-                for a in batch:
-                    anns.append({
-                        "id": a.id, "image_id": a.image_id, "frame": a.frame,
-                        "label_id": a.label_id, "shape_type": a.shape_type,
-                        "points": a.points, "occluded": a.occluded,
-                        "attributes": a.attributes,
-                        "track_id": a.track_id,
-                        "is_keyframe": a.is_keyframe,
-                        "outside": a.outside,
-                        "source": a.source,
-                    })
-                after_id = batch[-1].id
+            anns = [
+                {
+                    "id": a.id, "image_id": a.image_id, "frame": a.frame,
+                    "label_id": a.label_id, "shape_type": a.shape_type,
+                    "points": a.points, "occluded": a.occluded,
+                    "attributes": a.attributes,
+                    "track_id": a.track_id,
+                    "is_keyframe": a.is_keyframe,
+                    "outside": a.outside,
+                    "source": a.source,
+                }
+                for a in db.execute(
+                    select(Annotation).where(Annotation.task_id == job.task_id)
+                ).scalars()
+            ]
 
             ctx = ExportContext(
-                task_id=task.id, task_name=task.name,
-                images=images, annotations=anns, labels=labels,
+                task_id=task.id,
+                task_name=task.name,
+                task_type=task.task_type,
+                images=images,
+                annotations=anns,
+                labels=labels,
+                videos=videos,
                 include_images=job.include_images,
             )
+
+            # Guard: refuse video tasks with formats that don't support them
+            exporter = get_exporter(job.format)
+            if task.task_type == "video" and not exporter.supports_video:
+                raise ValueError(
+                    f"The {job.format.upper()} format does not support video tasks. "
+                    f"Use CVAT XML instead."
+                )
 
             job.progress = "Writing annotation files"
             db.commit()
 
-            # Build staging dir
             work_dir = os.path.join(EXPORT_ROOT, f"job-{job.id}")
             if os.path.exists(work_dir):
                 shutil.rmtree(work_dir)
             os.makedirs(work_dir)
 
-            exporter = get_exporter(job.format)
             exporter.write(work_dir, ctx)
 
-            # Optionally copy images into the export
-            if job.include_images:
+            if job.include_images and task.task_type == "image":
                 job.progress = "Copying images"
                 db.commit()
                 img_dir = os.path.join(work_dir, "images")
@@ -122,10 +136,11 @@ def build_export(self, job_id: int):
                         shutil.copy2(img["storage_path"],
                                      os.path.join(img_dir, img["filename"]))
 
-            # Zip it
             job.progress = "Packaging zip"
             db.commit()
-            zip_path = os.path.join(EXPORT_ROOT, f"task-{task.id}-{job.format}-{job.id}.zip")
+            zip_path = os.path.join(
+                EXPORT_ROOT, f"task-{task.id}-{job.format}-{job.id}.zip"
+            )
             with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
                 for root_dir, _, files in os.walk(work_dir):
                     for f in files:

@@ -1,37 +1,28 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
 @dataclass
 class ExportContext:
-    """
-    Everything an exporter needs. Passed by the worker so exporters are pure
-    functions — no DB, no filesystem access except to read image paths.
-    """
     task_id: int
     task_name: str
-    images: list[dict]        # [{id, filename, width, height, storage_path, frame}]
-    annotations: list[dict]   # [{id, image_id, frame, label_id, shape_type, points, occluded, attributes, track_id, is_keyframe}]
-    labels: list[dict]        # [{id, name, color}]
-    include_images: bool
+    task_type: str                              # "image" | "video"
+    images: list[dict]                          # [{id, filename, width, height, storage_path, frame}]
+    annotations: list[dict]                     # see annotation_to_dict below
+    labels: list[dict]                          # [{id, name, color}]
+    videos: list[dict] = field(default_factory=list)  # [{id, filename, fps, frames_dir}]
+    include_images: bool = True
 
 
 class Exporter(ABC):
-    """
-    Implement `write(output_dir, ctx)` to produce files inside `output_dir`.
-    The worker handles zipping.
-    """
-
-    name: str = ""              # "coco", "yolo", "voc", "cvat"
-    file_extension: str = ""    # ".json" for COCO/CVAT, ".xml" for VOC, per-image .txt for YOLO
+    name: str = ""
+    supports_video: bool = False
 
     @abstractmethod
-    def write(self, output_dir: str, ctx: ExportContext) -> None:
-        ...
+    def write(self, output_dir: str, ctx: ExportContext) -> None: ...
 
 
-# Registry — exporters self-register by format name
 EXPORTERS: dict[str, Exporter] = {}
 
 

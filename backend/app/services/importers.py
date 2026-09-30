@@ -1,25 +1,25 @@
 import json
 import os
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
 class ParsedAnnotation:
-    filename: str        # original image filename
+    filename: str
     shape_type: str
     points: list[float]
     external_label: str
     frame: int = 0
     occluded: bool = False
-    attributes: list = None
+    attributes: list = field(default_factory=list)
 
 
 @dataclass
 class ParsedDataset:
     annotations: list[ParsedAnnotation]
-    external_labels: set[str]     # distinct labels found in the file
-    image_files: list[str]        # filenames referenced
+    external_labels: set[str]
+    image_files: list[str]
 
 
 def parse_coco(path: str) -> ParsedDataset:
@@ -37,13 +37,23 @@ def parse_coco(path: str) -> ParsedDataset:
         labels.add(label)
         img_name = images.get(a["image_id"], "")
 
+        if a.get("segmentation") and isinstance(a["segmentation"], dict):
+            # RLE mask
+            out.append(ParsedAnnotation(
+                filename=img_name, shape_type="mask",
+                points=[json.dumps(a["segmentation"])],
+                external_label=label,
+            ))
+            continue
+
         if "bbox" in a and len(a["bbox"]) == 4:
             x, y, w, h = a["bbox"]
             out.append(ParsedAnnotation(
                 filename=img_name, shape_type="rectangle",
                 points=[x, y, x + w, y + h], external_label=label,
             ))
-        elif a.get("segmentation") and isinstance(a["segmentation"], list):
+
+        if a.get("segmentation") and isinstance(a["segmentation"], list):
             for seg in a["segmentation"]:
                 if isinstance(seg, list) and len(seg) >= 6:
                     out.append(ParsedAnnotation(
@@ -56,15 +66,13 @@ def parse_coco(path: str) -> ParsedDataset:
 
 
 def parse_yolo(images_dir: str, labels_dir: str, classes_path: str) -> ParsedDataset:
+    from PIL import Image as PILImage
+
     with open(classes_path) as f:
         class_names = [line.strip() for line in f if line.strip()]
 
     out: list[ParsedAnnotation] = []
-    labels: set[str] = set(class_names)
     image_files: list[str] = []
-
-    # Need image dimensions to denormalize. Read them with PIL.
-    from PIL import Image as PILImage
 
     for entry in sorted(os.listdir(images_dir)):
         if not entry.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".webp")):
@@ -96,7 +104,7 @@ def parse_yolo(images_dir: str, labels_dir: str, classes_path: str) -> ParsedDat
                     external_label=class_names[cls_idx] if cls_idx < len(class_names) else "unknown",
                 ))
 
-    return ParsedDataset(out, labels, image_files)
+    return ParsedDataset(out, set(class_names), image_files)
 
 
 def parse_voc(annotations_dir: str) -> ParsedDataset:
@@ -138,10 +146,10 @@ def parse_cvat(path: str) -> ParsedDataset:
     tree = ET.parse(path)
     root = tree.getroot()
 
-    images = {el.get("id"): el.get("name") for el in root.findall("image")}
+    images_by_id = {el.get("id"): el.get("name") for el in root.findall("image")}
     out: list[ParsedAnnotation] = []
     labels: set[str] = set()
-    image_files = list(images.values())
+    image_files = list(images_by_id.values())
 
     # Loose shapes inside <image>
     for img_el in root.findall("image"):
@@ -149,22 +157,28 @@ def parse_cvat(path: str) -> ParsedDataset:
         for shape in list(img_el):
             label = shape.get("label", "unknown")
             labels.add(label)
-            st = _cvat_shape_to_parsed(shape, fname, label)
-            if st:
-                out.append(st)
+            parsed = _cvat_shape_to_parsed(shape, fname, label)
+            if parsed:
+                out.append(parsed)
 
     # Tracks
     for track in root.findall("track"):
         label = track.get("label", "unknown")
         labels.add(label)
+        # Map every frame to the first image (for video tasks, this works because
+        # the frames become pseudo-images named frame_%06d.jpg)
         for shape in list(track):
             frame = int(shape.get("frame", "0"))
-            fname = next((v for k, v in images.items()), None)
+            fname = next(iter(images_by_id.values()), None)
             if not fname:
                 continue
-            st = _cvat_shape_to_parsed(shape, fname, label, frame)
-            if st:
-                out.append(st)
+            # Prefer the frame file if we can find it
+            frame_name = f"frame_{frame + 1:06d}.jpg"
+            if any(frame_name in v for v in images_by_id.values()):
+                fname = next(v for v in images_by_id.values() if frame_name in v)
+            parsed = _cvat_shape_to_parsed(shape, fname, label, frame)
+            if parsed:
+                out.append(parsed)
 
     return ParsedDataset(out, labels, image_files)
 
@@ -181,10 +195,11 @@ def _cvat_shape_to_parsed(shape, filename: str, label: str, frame: int = 0):
                                 points=[x1, y1, x2, y2], external_label=label,
                                 frame=frame, occluded=occluded)
     if tag in ("polygon", "polyline"):
-        pts = shape.get("points", "")
+        pts_str = shape.get("points", "")
         coords = []
-        for pair in pts.split(";"):
-            if not pair: continue
+        for pair in pts_str.split(";"):
+            if not pair:
+                continue
             x, y = pair.split(",")
             coords.extend([float(x), float(y)])
         if len(coords) >= 4:
@@ -195,10 +210,11 @@ def _cvat_shape_to_parsed(shape, filename: str, label: str, frame: int = 0):
                 frame=frame, occluded=occluded,
             )
     if tag == "points":
-        pts = shape.get("points", "")
+        pts_str = shape.get("points", "")
         coords = []
-        for pair in pts.split(";"):
-            if not pair: continue
+        for pair in pts_str.split(";"):
+            if not pair:
+                continue
             x, y = pair.split(",")
             coords.extend([float(x), float(y)])
         return ParsedAnnotation(filename=filename, shape_type="points",
@@ -208,9 +224,6 @@ def _cvat_shape_to_parsed(shape, filename: str, label: str, frame: int = 0):
 
 
 def detect_format(upload_dir: str) -> str:
-    """
-    Guess the format from the contents of the uploaded archive.
-    """
     if os.path.exists(os.path.join(upload_dir, "annotations.json")):
         return "coco"
     if os.path.exists(os.path.join(upload_dir, "annotations.xml")):

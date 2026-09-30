@@ -20,3 +20,10 @@ celery_app.conf.update(
     },
     task_default_queue="medium",
 )
+
+celery_app.conf.beat_schedule = {
+    "cleanup-expired-exports": {
+        "task": "cleanup.expired_exports",
+        "schedule": 3600.0,
+    },
+}

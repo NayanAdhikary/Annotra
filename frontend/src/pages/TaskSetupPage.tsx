@@ -226,7 +226,7 @@ export const TaskSetupPage: React.FC = () => {
                 </div>
             )}
 
-            {showExport && <ExportDrawer taskId={id} onClose={() => setShowExport(false)} />}
+            {showExport && <ExportDrawer taskId={id} taskType={task?.task_type || 'image'} onClose={() => setShowExport(false)} />}
             {showImport && (
               <ImportDrawer
                 taskId={id}

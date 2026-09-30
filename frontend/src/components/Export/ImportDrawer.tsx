@@ -1,210 +1,201 @@
-import React, { useState } from 'react';
-import { exportsApi } from '../../api/exports';
-import type { DetectResult, ImportJob } from '../../api/exports';
-import { labelsApi } from '../../api/labels';
-import type { Label } from '../../types/annotation';
+import React, { useState, useEffect } from 'react';
+import { exportsApi, type DetectResult, type ImportJob } from '../../api/exports';
+import { useAnnotationStore } from '../../store/annotationStore';
 
-interface Props {
-  taskId: number;
-  onClose: () => void;
-  onDone: () => void;
-}
-
-export const ImportDrawer: React.FC<Props> = ({ taskId, onClose, onDone }) => {
-  const [step, setStep] = useState<'upload' | 'map' | 'running' | 'done'>('upload');
+export const ImportDrawer: React.FC<{ taskId: number; onClose: () => void; onDone?: () => void }> = ({
+  taskId, onClose, onDone
+}) => {
   const [file, setFile] = useState<File | null>(null);
-  const [detected, setDetected] = useState<DetectResult | null>(null);
-  const [taskLabels, setTaskLabels] = useState<Label[]>([]);
-  const [mapping, setMapping] = useState<Record<string, number | null>>({});
-  const [asPre, setAsPre] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const [detectResult, setDetectResult] = useState<DetectResult | null>(null);
+  const [mapping, setMapping] = useState<Record<string, number>>({});
+  const [asPreannotations, setAsPreannotations] = useState(false);
+  
   const [job, setJob] = useState<ImportJob | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  
+  const labels = useAnnotationStore(s => s.labels);
 
-  // Load task labels once
-  React.useEffect(() => {
-    labelsApi.list(taskId).then(setTaskLabels);
-  }, [taskId]);
+  useEffect(() => {
+    if (!file) {
+      setDetectResult(null);
+      setMapping({});
+      return;
+    }
+    setDetecting(true);
+    exportsApi.detectImport(taskId, file).then(res => {
+      setDetectResult(res);
+      const newMap: Record<string, number> = {};
+      res.external_labels.forEach(ext => {
+        const match = labels.find(l => l.name.toLowerCase() === ext.toLowerCase());
+        if (match) newMap[ext] = match.id;
+      });
+      setMapping(newMap);
+    }).catch(err => {
+      alert('Failed to detect format: ' + err.message);
+      setFile(null);
+    }).finally(() => {
+      setDetecting(false);
+    });
+  }, [file, taskId, labels]);
 
-  const uploadAndDetect = async () => {
-    if (!file) return;
-    setBusy(true); setErr(null);
-    try {
-      const d = await exportsApi.detectImport(taskId, file);
-      setDetected(d);
-      // Auto-map by case-insensitive name match
-      const auto: Record<string, number | null> = {};
-      for (const ext of d.external_labels) {
-        const match = taskLabels.find(
-          (l) => l.name.toLowerCase() === ext.toLowerCase(),
-        );
-        auto[ext] = match?.id ?? null;
-      }
-      setMapping(auto);
-      setStep('map');
-    } catch (e: any) {
-      setErr(e?.response?.data?.detail ?? 'Upload failed');
-    } finally { setBusy(false); }
-  };
+  useEffect(() => {
+    if (!job) return;
+    if (job.status === 'done' || job.status === 'failed') {
+      if (job.status === 'done' && onDone) onDone();
+      return;
+    }
+    const timer = setInterval(() => {
+      exportsApi.getImport(job.id).then(setJob);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [job, onDone]);
 
-  const runImport = async () => {
-    if (!file || !detected) return;
+  const start = async () => {
+    if (!file || !detectResult) return;
     setBusy(true);
     try {
-      const finalMap: Record<string, number> = {};
-      for (const [k, v] of Object.entries(mapping)) {
-        if (v !== null) finalMap[k] = v;
-      }
       const j = await exportsApi.startImport(
-        taskId, detected.detected_format, finalMap, asPre, file,
+        taskId, detectResult.detected_format, mapping, asPreannotations, file
       );
       setJob(j);
-      setStep('running');
-      // Poll until done
-      const timer = setInterval(async () => {
-        const updated = await exportsApi.getImport(j.id);
-        setJob(updated);
-        if (updated.status === 'done' || updated.status === 'failed') {
-          clearInterval(timer);
-          setStep('done');
-          if (updated.status === 'done') onDone();
-        }
-      }, 1500);
     } catch (e: any) {
-      setErr(e?.response?.data?.detail ?? 'Import failed');
-      setStep('map');
-    } finally { setBusy(false); }
+      alert('Import failed to start: ' + e.message);
+    } finally {
+      setBusy(false);
+    }
   };
-
-  const unknownCount = Object.values(mapping).filter((v) => v === null).length;
 
   return (
     <div className="fixed inset-0 bg-black/40 flex justify-end z-50" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()}
-           className="bg-white w-[520px] h-full shadow-xl flex flex-col">
+           className="bg-white w-[540px] h-full shadow-xl flex flex-col">
         <div className="p-4 border-b flex items-center justify-between">
-          <h2 className="font-semibold">
-            {step === 'upload' && 'Import dataset'}
-            {step === 'map' && 'Map labels'}
-            {step === 'running' && 'Importing'}
-            {step === 'done' && 'Import complete'}
-          </h2>
+          <h2 className="font-semibold">Import dataset</h2>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-900">✕</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
-          {err && (
-            <div className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{err}</div>
-          )}
-
-          {step === 'upload' && (
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          {!job ? (
             <>
-              <p className="text-sm text-slate-600 mb-3">
-                Upload a zip containing annotation files in COCO, YOLO, Pascal VOC, or CVAT XML format.
-                We'll auto-detect the format.
-              </p>
-              <input
-                type="file"
-                accept=".zip"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                className="block w-full text-sm border border-slate-300 rounded px-3 py-2"
-              />
-              <button onClick={uploadAndDetect} disabled={!file || busy}
-                      className="w-full mt-4 bg-indigo-600 text-white rounded py-2 text-sm disabled:opacity-50">
-                {busy ? 'Detecting…' : 'Detect format'}
-              </button>
-            </>
-          )}
-
-          {step === 'map' && detected && (
-            <>
-              <div className="text-xs text-slate-500 mb-3">
-                Detected <span className="font-mono uppercase">{detected.detected_format}</span> ·
-                {' '}{detected.annotation_count} annotations ·
-                {' '}{detected.image_count} images referenced ·
-                {' '}{detected.external_labels.length} external labels
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Upload dataset zip
+                </label>
+                <input 
+                  type="file" 
+                  accept=".zip"
+                  onChange={e => setFile(e.target.files?.[0] || null)}
+                  className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-slate-200 rounded p-1"
+                />
               </div>
 
-              <div className="space-y-2">
-                {detected.external_labels.map((ext) => (
-                  <div key={ext} className="flex items-center gap-2">
-                    <span className="flex-1 text-sm font-medium truncate">{ext}</span>
-                    <span className="text-slate-400">→</span>
-                    <select
-                      value={mapping[ext] ?? ''}
-                      onChange={(e) => setMapping((m) => ({
-                        ...m,
-                        [ext]: e.target.value ? Number(e.target.value) : null,
-                      }))}
-                      className="border border-slate-300 rounded px-2 py-1 text-sm w-48"
-                    >
-                      <option value="">(skip — don't import)</option>
-                      {taskLabels.map((l) => (
-                        <option key={l.id} value={l.id}>{l.name}</option>
-                      ))}
-                    </select>
+              {detecting && <div className="text-sm text-slate-500">Analyzing archive…</div>}
+
+              {detectResult && (
+                <div className="space-y-4">
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-sm space-y-1">
+                    <div><span className="font-medium text-slate-700">Format detected:</span> <span className="uppercase">{detectResult.detected_format}</span></div>
+                    <div><span className="font-medium text-slate-700">Images:</span> {detectResult.image_count}</div>
+                    <div><span className="font-medium text-slate-700">Annotations:</span> {detectResult.annotation_count}</div>
                   </div>
-                ))}
-              </div>
 
-              {unknownCount > 0 && (
-                <div className="mt-3 text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded">
-                  {unknownCount} label{unknownCount === 1 ? '' : 's'} will be skipped.
-                  Annotations using them will not be imported.
+                  <div>
+                    <h3 className="text-sm font-medium text-slate-700 mb-2">Label Mapping</h3>
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            <th className="px-3 py-2 font-medium text-slate-700">Dataset label</th>
+                            <th className="px-3 py-2 font-medium text-slate-700">Map to task label</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {detectResult.external_labels.map(ext => {
+                            const isUnmapped = !mapping[ext];
+                            return (
+                              <tr key={ext} className={isUnmapped ? 'bg-amber-50/50' : ''}>
+                                <td className={`px-3 py-2 ${isUnmapped ? 'text-amber-900' : 'text-slate-700'}`}>
+                                  {ext}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <select 
+                                    value={mapping[ext] || ''} 
+                                    onChange={(e) => setMapping({...mapping, [ext]: Number(e.target.value) || 0})}
+                                    className={`w-full border rounded px-2 py-1 ${isUnmapped ? 'border-amber-300' : 'border-slate-300'}`}
+                                  >
+                                    <option value="">-- Ignore --</option>
+                                    {labels.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                  </select>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {detectResult.external_labels.length === 0 && (
+                            <tr><td colSpan={2} className="px-3 py-4 text-center text-slate-500">No labels found in dataset.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-2 text-sm pt-2">
+                    <input type="checkbox" checked={asPreannotations}
+                           onChange={(e) => setAsPreannotations(e.target.checked)} />
+                    Import as pre-annotations (can be reviewed)
+                  </label>
+
+                  <button onClick={start} disabled={busy}
+                          className="w-full bg-indigo-600 text-white rounded py-2 text-sm hover:bg-indigo-700 disabled:opacity-50 mt-4">
+                    {busy ? 'Starting…' : 'Start import'}
+                  </button>
                 </div>
               )}
-
-              <label className="flex items-center gap-2 text-sm mt-4 pt-4 border-t">
-                <input type="checkbox" checked={asPre}
-                       onChange={(e) => setAsPre(e.target.checked)} />
-                <span>
-                  Import as <b>pre-annotations</b>
-                  <span className="block text-xs text-slate-500">
-                    Land in the review queue as model predictions (source=auto).
-                  </span>
-                </span>
-              </label>
-
-              <button onClick={runImport} disabled={busy}
-                      className="w-full mt-4 bg-indigo-600 text-white rounded py-2 text-sm disabled:opacity-50">
-                {busy ? 'Starting…' : 'Start import'}
-              </button>
             </>
-          )}
-
-          {step === 'running' && job && (
-            <div className="text-center py-12">
-              <div className="text-3xl mb-3">⏳</div>
-              <p className="text-sm text-slate-700">{job.progress ?? 'Importing…'}</p>
-            </div>
-          )}
-
-          {step === 'done' && job && (
-            <div className="text-center py-8">
-              {job.status === 'done' ? (
-                <>
-                  <div className="text-4xl mb-3">✓</div>
-                  <h3 className="font-medium text-slate-900">Import complete</h3>
-                  <p className="text-sm text-slate-500 mt-1">
-                    {job.stats?.imported} annotations imported ·
-                    {' '}{job.stats?.skipped} skipped
-                  </p>
-                  {job.stats?.unknown_labels?.length ? (
-                    <p className="text-xs text-amber-700 mt-2">
-                      Unknown labels: {job.stats.unknown_labels.join(', ')}
-                    </p>
-                  ) : null}
-                  <button onClick={onClose}
-                          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded text-sm">
-                    Close
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="text-4xl mb-3">⚠</div>
-                  <h3 className="font-medium text-red-600">Import failed</h3>
-                  <p className="text-sm text-slate-500 mt-1">{job.error}</p>
-                </>
+          ) : (
+            <div className="space-y-4">
+              <div className="border border-slate-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-medium text-slate-900">Import Job #{job.id}</h3>
+                  <span className="text-sm px-2 py-1 rounded bg-slate-100 text-slate-700 capitalize">
+                    {job.status}
+                  </span>
+                </div>
+                
+                {job.status === 'failed' ? (
+                  <div className="text-red-600 text-sm bg-red-50 p-3 rounded">
+                    {job.error || 'Unknown error occurred'}
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-600">
+                    {job.progress || 'Processing...'}
+                  </div>
+                )}
+                
+                {job.status === 'done' && job.stats && (
+                  <div className="mt-4 pt-4 border-t border-slate-100 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Annotations imported:</span>
+                      <span className="font-medium text-green-600">{job.stats.imported || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Shapes skipped:</span>
+                      <span className="font-medium">{job.stats.skipped || 0}</span>
+                    </div>
+                    {(job.stats.unknown_labels || []).length > 0 && (
+                      <div className="mt-2 text-slate-500">
+                        Ignored labels: <span className="text-slate-700">{job.stats.unknown_labels!.join(', ')}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {(job.status === 'done' || job.status === 'failed') && (
+                <button onClick={() => { setJob(null); setFile(null); setDetectResult(null); }}
+                        className="w-full bg-slate-100 text-slate-700 rounded py-2 text-sm hover:bg-slate-200">
+                  Import another
+                </button>
               )}
             </div>
           )}

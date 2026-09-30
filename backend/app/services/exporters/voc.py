@@ -5,28 +5,8 @@ from app.services.exporters.base import Exporter, ExportContext, register
 
 
 class VOCExporter(Exporter):
-    """
-    Pascal VOC 2007. One XML per image:
-
-    <annotation>
-      <folder>images</folder>
-      <filename>foo.jpg</filename>
-      <size><width>1920</width><height>1080</height><depth>3</depth></size>
-      <object>
-        <name>car</name>
-        <pose>Unspecified</pose>
-        <truncated>0</truncated>
-        <difficult>0</difficult>
-        <bndbox>
-          <xmin>..</xmin><ymin>..</ymin><xmax>..</xmax><ymax>..</ymax>
-        </bndbox>
-      </object>
-    </annotation>
-
-    Polygons/polylines are stored as their bounding box. Points are skipped.
-    """
     name = "voc"
-    file_extension = ".xml"
+    supports_video = False
 
     def write(self, output_dir: str, ctx: ExportContext) -> None:
         ann_dir = os.path.join(output_dir, "annotations")
@@ -53,15 +33,14 @@ class VOCExporter(Exporter):
                 name = labels.get(a["label_id"])
                 if not name:
                     continue
-
                 pts = a["points"]
-                xs = pts[0::2]; ys = pts[1::2]
+                xs = pts[0::2]
+                ys = pts[1::2]
                 obj = SubElement(root, "object")
                 SubElement(obj, "name").text = name
                 SubElement(obj, "pose").text = "Unspecified"
                 SubElement(obj, "truncated").text = "0"
                 SubElement(obj, "difficult").text = "1" if a.get("occluded") else "0"
-
                 bnd = SubElement(obj, "bndbox")
                 SubElement(bnd, "xmin").text = str(int(min(xs)))
                 SubElement(bnd, "ymin").text = str(int(min(ys)))
