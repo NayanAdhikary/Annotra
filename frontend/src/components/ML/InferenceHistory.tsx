@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { mlApi, InferenceJob } from '../../api/ml';
+import { mlApi } from '../../api/ml';
+import type { InferenceJob } from '../../api/ml';
 
 export const InferenceHistory: React.FC<{ taskId: number }> = ({ taskId }) => {
   const [jobs, setJobs] = useState<InferenceJob[]>([]);

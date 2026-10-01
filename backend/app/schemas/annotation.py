@@ -27,6 +27,7 @@ class AnnotationCreate(BaseModel):
     shape_type: ShapeType
     points: List[Any]
     frame: int = 0
+    image_id: Optional[int] = None
     occluded: bool = False
     attributes: List[Any] = Field(default_factory=list)
     group_id: int = 0

@@ -1,5 +1,5 @@
 from fastapi import status
-from sqlalchemy import Column, Integer, BigInteger, String, ForeignKey, DateTime, func, Boolean, Text, JSON
+from sqlalchemy import Column, Integer, BigInteger, String, ForeignKey, DateTime, func, Boolean, Text, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -68,7 +68,7 @@ class TaskComment(Base):
 class Label(Base):
     __tablename__ = "labels"
 
-    id          = Column(BigInteger, primary_key=True)
+    id          = Column(Integer, primary_key=True, autoincrement=True)
     task_id     = Column(BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"),
                          nullable=False, index=True)
     name        = Column(String(100), nullable=False)
@@ -87,3 +87,26 @@ class ImageAsset(Base):
     height = Column(Integer)
     storage_path = Column(String(1000), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class ImageAnnotationStatus(Base):
+    __tablename__ = "image_annotation_status"
+
+    id         = Column(BigInteger, primary_key=True)
+    task_id    = Column(BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"),
+                        nullable=False, index=True)
+    image_id   = Column(BigInteger, ForeignKey("image_assets.id", ondelete="CASCADE"),
+                        nullable=False, index=True)
+    user_id    = Column(BigInteger, ForeignKey("users.id", ondelete="SET NULL"),
+                        nullable=True, index=True)
+
+    status       = Column(String(20), default="pending", nullable=False, index=True)
+    # "pending" | "in_progress" | "completed" | "skipped"
+    skip_reason  = Column(String(500))
+
+    started_at   = Column(DateTime(timezone=True))
+    completed_at = Column(DateTime(timezone=True))
+    updated_at   = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("task_id", "image_id", "user_id", name="uq_image_status_user"),
+    )

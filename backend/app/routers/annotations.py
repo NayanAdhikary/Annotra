@@ -80,6 +80,12 @@ async def create_annotation(
         created_by=user.id,
     )
     db.add(ann)
+    await db.flush()
+    
+    if payload.image_id:
+        from app.services.image_status import mark_in_progress
+        await mark_in_progress(db, task_id, payload.image_id, user.id)
+
     await db.commit()
     await db.refresh(ann)
     return ann
@@ -169,6 +175,10 @@ async def update_annotation(ann_id: int, payload: AnnotationUpdate,
     for k, v in data.items():
         setattr(ann, k, v)
 
+    if ann.image_id:
+        from app.services.image_status import mark_in_progress
+        await mark_in_progress(db, ann.task_id, ann.image_id, user.id)
+
     await db.commit()
     await db.refresh(ann)
     return ann
@@ -180,10 +190,21 @@ async def delete_annotation(ann_id: int,
                             db: AsyncSession = Depends(get_db),
                             user: User = Depends(get_current_user)):
     ann = await _assert_can_edit(db, ann_id, user)
+    task_id = ann.task_id
+    image_id = ann.image_id
+    
     await audit(db, user=user, action="annotation.delete",
                 resource_type="annotation", resource_id=ann.id, request=request)
     await db.execute(delete(Annotation).where(Annotation.id == ann_id))
     await db.commit()
+    
+    if image_id:
+        from sqlalchemy import func
+        from app.services.image_status import reset_to_pending
+        count = (await db.execute(select(func.count()).select_from(Annotation).where(Annotation.image_id == image_id))).scalar_one()
+        if count == 0:
+            await reset_to_pending(db, task_id, image_id, user.id)
+            await db.commit()
 
 
 @router.get("/tasks/{task_id}/annotations")

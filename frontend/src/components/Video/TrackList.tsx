@@ -1,9 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useVideoStore } from '../../store/videoStore';
 import { useAnnotationStore } from '../../store/annotationStore';
 import { api } from '../../api/client';
+import { useIsAdminOrManager } from '../../hooks/useRoleAccess';
+import { LabelEditor } from '../TaskSetup/LabelEditor';
+import { useParams } from 'react-router-dom';
+
+type Tab = 'tracks' | 'admin';
 
 export const TrackList: React.FC = () => {
+  const { taskId } = useParams<{ taskId: string }>();
+  const id = Number(taskId);
+  const [tab, setTab] = useState<Tab>('tracks');
+  const isAdmin = useIsAdminOrManager();
+
   const tracks = useVideoStore((s) => s.tracks);
   const currentFrame = useVideoStore((s) => s.currentFrame);
   const setFrame = useVideoStore((s) => s.setFrame);
@@ -17,18 +27,38 @@ export const TrackList: React.FC = () => {
   };
 
   return (
-    <aside className="w-72 border-l bg-white flex flex-col overflow-hidden">
-      <header className="px-4 py-3 border-b flex items-center justify-between">
-        <h3 className="font-semibold text-sm">Tracks</h3>
-        <span className="text-xs text-slate-500">{tracks.length}</span>
-      </header>
+    <aside className="w-80 border-l bg-white flex flex-col overflow-hidden">
+      <div className="flex border-b overflow-x-auto">
+        <button
+          onClick={() => setTab('tracks')}
+          className={`flex-1 py-2 px-2 whitespace-nowrap text-xs font-medium border-b-2 ${
+            tab === 'tracks'
+              ? 'border-indigo-600 text-indigo-700'
+              : 'border-transparent text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          Tracks ({tracks.length})
+        </button>
+        {isAdmin && (
+          <button onClick={() => setTab('admin')}
+                  className={`flex-1 py-2 px-2 whitespace-nowrap text-xs font-medium border-b-2 ${
+                    tab === 'admin'
+                      ? 'border-indigo-600 text-indigo-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}>
+            Admin
+          </button>
+        )}
+      </div>
 
       <div className="flex-1 overflow-y-auto">
-        {tracks.length === 0 && (
-          <p className="text-xs text-slate-400 text-center py-8">
-            No tracks yet. Draw a box to create one.
-          </p>
-        )}
+        {tab === 'tracks' && (
+          <>
+            {tracks.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-8">
+                No tracks yet. Draw a box to create one.
+              </p>
+            )}
 
         {tracks.map((t) => {
           const label = labels.find((l) => l.id === t.labelId);
@@ -112,6 +142,13 @@ export const TrackList: React.FC = () => {
             </div>
           );
         })}
+        </>
+        )}
+        {tab === 'admin' && (
+          <div className="p-4">
+            <LabelEditor taskId={id} />
+          </div>
+        )}
       </div>
     </aside>
   );

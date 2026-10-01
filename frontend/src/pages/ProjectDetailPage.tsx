@@ -74,6 +74,18 @@ export const ProjectDetailPage: React.FC = () => {
         },
     });
 
+    const handleDeleteProject = async () => {
+        if (!window.confirm(`Are you sure you want to delete the project "${project?.name}"? This action cannot be undone and will delete all associated tasks, images, and annotations.`)) return;
+        try {
+            await projectsAPI.remove(projectId);
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
+            navigate('/');
+        } catch (e) {
+            console.error(e);
+            alert("Failed to delete project.");
+        }
+    };
+
     if (isProjectLoading || isTasksLoading) return <div className="p-8">Loading...</div>;
     if (!project) return <div className="p-8">Project not found.</div>;
 
@@ -94,12 +106,20 @@ export const ProjectDetailPage: React.FC = () => {
                     )}
                 </div>
                 {isAdmin && (
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 font-medium whitespace-nowrap"
-                    >
-                        Create task
-                    </button>
+                    <div className="flex gap-3 items-center">
+                        <button
+                            onClick={handleDeleteProject}
+                            className="px-4 py-2 border border-red-300 text-red-600 rounded-md hover:bg-red-50 font-medium whitespace-nowrap"
+                        >
+                            Delete project
+                        </button>
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 font-medium whitespace-nowrap"
+                        >
+                            Create task
+                        </button>
+                    </div>
                 )}
             </div>
             

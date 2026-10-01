@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { adminApi } from '../../api/admin';
 import { ProjectDataTab } from '../../components/Admin/ProjectDataTab';
 import { ProjectTeamTab } from '../../components/Admin/ProjectTeamTab';
+import { ProjectSetupTab } from '../../components/Admin/ProjectSetupTab';
 
 export interface AdminProject {
   id: number; name: string; description: string | null;
@@ -19,7 +20,7 @@ export interface AdminTask {
   assignees: { user_id: number; role: string; name: string; email: string }[];
 }
 
-type Tab = 'overview' | 'data' | 'team';
+type Tab = 'overview' | 'data' | 'team' | 'setup';
 
 const CreateTaskModal: React.FC<{
   projectId: number;
@@ -96,6 +97,7 @@ const CreateTaskModal: React.FC<{
 export const AdminProjectDetailPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const id = Number(projectId);
+  const navigate = useNavigate();
 
   const [tab, setTab] = useState<Tab>('overview');
   const [project, setProject] = useState<AdminProject | null>(null);
@@ -143,6 +145,7 @@ export const AdminProjectDetailPage: React.FC = () => {
     { key: 'overview', label: 'Overview' },
     { key: 'data',     label: 'Data' },
     { key: 'team',     label: 'Team & assignments' },
+    { key: 'setup',    label: 'Setup & Labels' },
   ];
 
   return (
@@ -166,7 +169,21 @@ export const AdminProjectDetailPage: React.FC = () => {
               {' '}({project.owner_email})
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-center">
+            <button
+              onClick={async () => {
+                if (!window.confirm(`Are you sure you want to delete ${project.name}?`)) return;
+                try {
+                  await api.delete(`/api/projects/${id}`);
+                  navigate('/admin/projects');
+                } catch (e: any) {
+                  alert(e?.response?.data?.detail ?? 'Failed to delete project');
+                }
+              }}
+              className="px-4 py-2 border border-red-300 text-red-600 text-sm font-medium rounded-md hover:bg-red-50 shadow-sm"
+            >
+              Delete project
+            </button>
             <button
               onClick={() => setShowCreateTask(true)}
               className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 shadow-sm"
@@ -210,6 +227,9 @@ export const AdminProjectDetailPage: React.FC = () => {
         )}
         {tab === 'team' && (
           <ProjectTeamTab projectId={id} tasks={tasks} onChanged={refresh} />
+        )}
+        {tab === 'setup' && (
+          <ProjectSetupTab projectId={id} tasks={tasks} onChanged={refresh} />
         )}
       </div>
 
@@ -262,6 +282,7 @@ const OverviewTab: React.FC<{ project: AdminProject; tasks: AdminTask[] }> = ({
               <th className="px-4 py-2 font-medium">Status</th>
               <th className="px-4 py-2 font-medium">Progress</th>
               <th className="px-4 py-2 font-medium">Staffed</th>
+              <th className="px-4 py-2 font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -279,6 +300,11 @@ const OverviewTab: React.FC<{ project: AdminProject; tasks: AdminTask[] }> = ({
                     : <span className="text-xs text-emerald-700">
                         {t.assignees.length} user{t.assignees.length === 1 ? '' : 's'}
                       </span>}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <Link to={`/tasks/${t.id}/setup`} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                    Setup →
+                  </Link>
                 </td>
               </tr>
             ))}

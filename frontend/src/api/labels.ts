@@ -7,12 +7,12 @@ export const labelsApi = {
     return data;
   },
 
-  create: async (taskId: number, name: string, color: string): Promise<Label> => {
-    const { data } = await api.post(`/api/tasks/${taskId}/labels`, { name, color });
+  create: async (taskId: number, name: string, color: string, attributes?: any[]): Promise<Label> => {
+    const { data } = await api.post(`/api/tasks/${taskId}/labels`, { name, color, attributes });
     return data;
   },
 
-  update: async (labelId: number, patch: Partial<Pick<Label, 'name' | 'color'>>): Promise<Label> => {
+  update: async (labelId: number, patch: Partial<Pick<Label, 'name' | 'color'> & { attributes: any[] }>): Promise<Label> => {
     const { data } = await api.patch(`/api/labels/${labelId}`, patch);
     return data;
   },

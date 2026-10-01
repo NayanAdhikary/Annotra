@@ -8,6 +8,7 @@ export interface Annotation {
   id: string;
   serverId?: number;
   taskId: number;
+  imageId?: number;
   frame: number;
   labelId: number;
   shapeType: ShapeType;
@@ -19,6 +20,7 @@ export interface Annotation {
   updatedAt?: string;
   conflict?: any;
   saveError?: any;
+  attributes?: any[];
 
   reviewStatus?: 'pending' | 'accepted' | 'rejected' | 'fixed';
   reviewedBy?: number | null;

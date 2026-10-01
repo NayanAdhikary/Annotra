@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from app.routers import auth, projects, tasks, annotations, labels, images, admin, announcements, videos, exports, notifications, review, ml
+from app.routers import auth, projects, tasks, annotations, labels, images, admin, announcements, videos, exports, notifications, review, ml, image_status, submission
 
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -87,6 +87,8 @@ app.include_router(videos.router, prefix="/api", tags=["videos"])
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
 app.include_router(review.router, prefix="/api", tags=["review"])
 app.include_router(ml.router, prefix="/api", tags=["ml"])
+app.include_router(image_status.router, prefix="/api", tags=["image-status"])
+app.include_router(submission.router, prefix="/api", tags=["submission"])
 os.makedirs("/data/models", exist_ok=True)
 @app.get("/health")
 async def health():

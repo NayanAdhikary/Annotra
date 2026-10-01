@@ -167,6 +167,42 @@ async def me(user: User = Depends(get_current_user)):
     return _to_response(user)
 
 
+from datetime import timedelta
+from app.models.annotation import Annotation
+from sqlalchemy import func
+
+@router.get("/me/stats")
+async def my_stats(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    total = (await db.execute(
+        select(func.count()).select_from(Annotation).where(Annotation.created_by == user.id)
+    )).scalar_one()
+    accepted = (await db.execute(
+        select(func.count()).select_from(Annotation)
+        .where(Annotation.created_by == user.id, Annotation.review_status == "accepted")
+    )).scalar_one()
+    rejected = (await db.execute(
+        select(func.count()).select_from(Annotation)
+        .where(Annotation.created_by == user.id, Annotation.review_status == "rejected")
+    )).scalar_one()
+    denom = accepted + rejected
+    rate = (accepted / denom) if denom else 0.0
+
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    week_count = (await db.execute(
+        select(func.count()).select_from(Annotation)
+        .where(Annotation.created_by == user.id, Annotation.created_at >= week_ago)
+    )).scalar_one()
+
+    return {
+        "total_annotated": total,
+        "total_accepted": accepted,
+        "total_rejected": rejected,
+        "acceptance_rate": round(rate, 4),
+        "tasks_completed": 0,
+        "avg_per_day_7d": round(week_count / 7.0, 1),
+    }
+
+
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
 async def change_password(
     payload: ChangePasswordRequest,

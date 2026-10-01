@@ -6,7 +6,9 @@ export interface CreateAnnotationPayload {
   shape_type: ShapeType;
   points: number[];
   frame: number;
+  image_id?: number;
   occluded?: boolean;
+  attributes?: any[];
 }
 
 function mapShape(s: any, taskId: number): any {
@@ -15,6 +17,7 @@ function mapShape(s: any, taskId: number): any {
     serverId: s.id,
     taskId,
     frame: s.frame,
+    imageId: s.image_id,
     labelId: s.label_id,
     shapeType: s.type,
     points: s.points,

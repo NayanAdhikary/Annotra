@@ -75,6 +75,7 @@ class TaskResponse(BaseModel):
     updated_at: Optional[datetime]
     last_submitted_at: Optional[datetime] = None
     last_submitted_by: Optional[int] = None
+    last_submission_note: Optional[str] = None
 
     class Config:
         from_attributes = True

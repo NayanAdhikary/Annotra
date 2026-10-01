@@ -235,6 +235,14 @@ async def _task_response(db: AsyncSession, t: Task) -> TaskResponse:
             "email": u.email if u else None,
         })
 
+    last_note = (await db.execute(
+        select(TaskComment)
+        .where(TaskComment.task_id == t.id,
+               TaskComment.body.like("[Submission note]%"))
+        .order_by(TaskComment.created_at.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+
     return TaskResponse(
         id=t.id, project_id=t.project_id,
         project_name=project.name if project else None,
@@ -247,6 +255,7 @@ async def _task_response(db: AsyncSession, t: Task) -> TaskResponse:
         archived_at=t.archived_at, completed_at=t.completed_at,
         created_at=t.created_at, updated_at=t.updated_at,
         last_submitted_at=t.last_submitted_at, last_submitted_by=t.last_submitted_by,
+        last_submission_note=last_note.body if last_note else None,
     )
 
 
@@ -388,6 +397,28 @@ async def update_task(
     await db.commit()
     await db.refresh(t)
     return await _task_response(db, t)
+
+
+@router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_task(
+    task_id: int, request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    t = await db.get(Task, task_id)
+    if t is None:
+        raise HTTPException(404, "Task not found")
+    project = await db.get(Project, t.project_id)
+    if project.owner_id != user.id and user.role not in (
+        UserRole.ADMIN.value, UserRole.MANAGER.value,
+    ):
+        raise HTTPException(403, "Not your task")
+
+    await audit(db, user=user, action="task.delete",
+                resource_type="task", resource_id=t.id,
+                meta={"name": t.name}, request=request)
+    await db.delete(t)
+    await db.commit()
 
 
 @router.post("/tasks/{task_id}/transition", response_model=TaskResponse)

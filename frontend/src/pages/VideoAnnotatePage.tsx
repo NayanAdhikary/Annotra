@@ -24,6 +24,7 @@ export const VideoAnnotatePage: React.FC = () => {
 
   const [video, setVideo] = useState<Video | null>(null);
   const [taskName, setTaskName] = useState('');
+  const [projectId, setProjectId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [polling, setPolling] = useState(true);
 
@@ -43,6 +44,7 @@ export const VideoAnnotatePage: React.FC = () => {
       if (cancelled) return;
       setTask(id);
       setTaskName(task.name);
+      setProjectId(task.project_id);
       setLabels(labels);
     })();
     return () => { cancelled = true; };
@@ -108,9 +110,9 @@ export const VideoAnnotatePage: React.FC = () => {
         <div className="text-5xl mb-3">⚠</div>
         <h2 className="text-xl font-semibold mb-2">Frame extraction failed</h2>
         <p className="text-sm text-slate-500 mb-4">{video.extraction_error}</p>
-        <Link to={`/tasks/${id}/setup`}
+        <Link to={projectId ? `/projects/${projectId}` : '/'}
               className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">
-          Back to setup
+          Back to Project
         </Link>
       </div>
     );
@@ -121,7 +123,7 @@ export const VideoAnnotatePage: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-slate-100">
       <header className="h-12 border-b bg-white flex items-center px-3 gap-3 flex-shrink-0">
-        <Link to={`/tasks/${id}/setup`} className="text-slate-500 hover:text-slate-900 text-sm">←</Link>
+        <Link to={projectId ? `/projects/${projectId}` : '/'} className="text-slate-500 hover:text-slate-900 text-sm">←</Link>
         <span className="text-sm font-medium truncate">{taskName}</span>
         <span className="text-xs text-slate-400">·</span>
         <span className="text-xs text-slate-500 truncate">{video.filename}</span>

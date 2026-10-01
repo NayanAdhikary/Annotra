@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { mlApi, MLModel } from '../../api/ml';
+import { mlApi } from '../../api/ml';
+import type { MLModel } from '../../api/ml';
 
 const fmtBytes = (b: number | null) => {
   if (!b) return '';

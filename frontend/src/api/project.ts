@@ -24,6 +24,7 @@ export interface Task {
     annotated_count: number;
     created_at: string;
     assignees?: { user_id: number; role: string; name: string | null; email: string | null }[];
+    last_submission_note?: string;
 }
 
 

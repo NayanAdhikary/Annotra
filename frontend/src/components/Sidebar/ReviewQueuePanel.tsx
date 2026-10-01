@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { reviewApi } from '../../api/review';
 import { useReviewStore } from '../../store/reviewStore';
 import { useAnnotationStore } from '../../store/annotationStore';
+import { SkippedImagesList } from '../Review/SkippedImagesList';
 
 export const ReviewQueuePanel: React.FC<{ taskId: number }> = ({ taskId }) => {
   const { stats, pendingIds, rejectedIds, setStats } = useReviewStore();
@@ -95,9 +96,12 @@ export const ReviewQueuePanel: React.FC<{ taskId: number }> = ({ taskId }) => {
                 #{id}
               </button>
             ))}
+            </div>
           </div>
         </div>
       )}
+
+      <SkippedImagesList taskId={taskId} onJump={(idx) => useAnnotationStore.getState().setFrame(idx)} />
     </div>
   );
 };

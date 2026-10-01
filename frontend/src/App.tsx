@@ -15,6 +15,7 @@ const TaskSetupPage = React.lazy(() => import('./pages/TaskSetupPage').then(m =>
 const AnnotatePage = React.lazy(() => import('./pages/AnnotatePage').then(m => ({ default: m.AnnotatePage })));
 const VideoAnnotatePage = React.lazy(() => import('./pages/VideoAnnotatePage').then(m => ({ default: m.VideoAnnotatePage })));
 const MyTasksPage = React.lazy(() => import('./pages/MyTaskPage').then(m => ({ default: m.MyTasksPage })));
+const MyStatsPage = React.lazy(() => import('./pages/MyStatsPage').then(m => ({ default: m.MyStatsPage })));
 const TaskDetailPage = React.lazy(() => import('./pages/TaskDetailPage').then(m => ({ default: m.TaskDetailPage })));
 
 const AdminQualityPage = React.lazy(() => import('./pages/admin/AdminQualityPage').then(m => ({ default: m.AdminQualityPage })));
@@ -56,6 +57,9 @@ export const App: React.FC = () => {
         } />
         <Route path="/my-tasks" element={
           <ProtectedRoute><AppLayout><SuspenseWrapper><MyTasksPage /></SuspenseWrapper></AppLayout></ProtectedRoute>
+        } />
+        <Route path="/my-stats" element={
+          <ProtectedRoute><AppLayout><SuspenseWrapper><MyStatsPage /></SuspenseWrapper></AppLayout></ProtectedRoute>
         } />
         <Route path="/projects/:projectId" element={
           <ProtectedRoute><AppLayout><SuspenseWrapper><ProjectDetailPage /></SuspenseWrapper></AppLayout></ProtectedRoute>

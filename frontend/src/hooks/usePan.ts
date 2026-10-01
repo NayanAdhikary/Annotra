@@ -72,11 +72,22 @@ export function usePan(stageRef: React.RefObject<any>, activeTool: string) {
         ? 'default'
         : 'crosshair';
 
+  const startProgrammatic = useCallback((e: any) => {
+    const p = stageRef.current?.getPointerPosition();
+    if (!p) return;
+    const { live } = useViewportStore.getState();
+    panRef.current = { sx: p.x, sy: p.y, vx: live.x, vy: live.y };
+    if (stageRef.current?.container()) {
+      stageRef.current.container().style.cursor = 'grabbing';
+    }
+  }, [stageRef]);
+
   return {
     onMouseDown,
     onMouseMove,
     onMouseUp,
     cursor,
     isPanning: () => !!panRef.current,
+    startProgrammatic,
   };
 }

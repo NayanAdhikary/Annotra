@@ -56,3 +56,7 @@ httptools==0.6.4
 
 psutil
 ultralytics==8.3.40
+
+psutil
+
+sentry-sdk

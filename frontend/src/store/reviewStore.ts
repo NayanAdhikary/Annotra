@@ -15,6 +15,7 @@ interface ReviewState {
     rejectedIds: number[]; 
     filter: 'all' | 'pending' | 'rejected' | 'accepted';
     setStats: (s: Stats, pending: number[], rejected: number []) => void;
+    setFilter: (filter: 'all' | 'pending' | 'rejected' | 'accepted') => void;
     clear: () => void;
 }
 
@@ -24,6 +25,6 @@ export const useReviewStore = create<ReviewState>((set) => ({
   rejectedIds: [],
   filter: 'all',
   setStats: (stats, pendingIds, rejectedIds) => set({ stats, pendingIds, rejectedIds }),
-  setFilter: (filter) => set({ filter }),
+  setFilter: (filter: 'all' | 'pending' | 'rejected' | 'accepted') => set({ filter }),
   clear: () => set({ stats: null, pendingIds: [], rejectedIds: [], filter: 'all' }),
 }));

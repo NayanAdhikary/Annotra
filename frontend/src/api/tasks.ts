@@ -91,4 +91,7 @@ export const tasksApi = {
 
   myTasks: async (params: { status?: TaskStatus; role?: 'annotator' | 'reviewer'; include_archived?: boolean } = {}): Promise<MyTaskRow[]> =>
     (await api.get('/api/me/tasks', { params })).data,
+
+  remove: async (id: number): Promise<void> =>
+    api.delete(`/api/tasks/${id}`),
 };

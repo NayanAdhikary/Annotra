@@ -25,12 +25,13 @@ import { AddAnnotationCommand } from '../../commands/AnnotationCommands';
 
 interface Props {
   taskId: number;
+  imageId: number | null;
   imageUrl: string;
   width: number;
   height: number;
 }
 
-export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, height }) => {
+export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, width, height }) => {
   const [img] = useImage(imageUrl);
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -112,10 +113,13 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
 
   const commitShape = useCallback(
     async (shapeType: Annotation['shapeType'], points: number[]) => {
-      if (!activeLabelId) return;
+      if (!activeLabelId || !imageId) {
+        console.warn('[draw] bailing - missing activeLabelId or imageId', { activeLabelId, imageId });
+        return;
+      }
       const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const draft: Annotation = {
-        id: localId, taskId, frame,
+        id: localId, taskId, imageId, frame,
         labelId: activeLabelId, shapeType, points,
         occluded: false, source: 'manual', groupId: 0,
       };
@@ -129,17 +133,19 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
             label_id: activeLabelId,
             shape_type: shapeType,
             points, frame,
+            image_id: imageId,
           }),
         );
         attachServerId(localId, server.id);
-      } catch (e) {
+      } catch (e: any) {
         console.error('persist failed', e);
         // Rollback via history store (and pop future so it can't be redone)
         useHistoryStore.getState().undo();
         useHistoryStore.setState({ future: [] });
+        alert(e?.response?.data?.detail ?? "Couldn't save. Please retry.");
       }
     },
-    [taskId, frame, activeLabelId, execute, attachServerId, wrap],
+    [taskId, imageId, frame, activeLabelId, execute, attachServerId, wrap],
   );
 
   const onMouseDown = useCallback((e: any) => {
@@ -152,8 +158,14 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
       return;
     }
     if (currentTool === 'select') {
-      if (onStage) marquee.begin(x, y, (e.evt as MouseEvent).shiftKey);
-      return;
+      if (onStage) {
+        if (e.evt.shiftKey) {
+          marquee.begin(x, y, true);
+        } else {
+          pan.startProgrammatic(e);
+        }
+        return;
+      }
     }
     if (currentTool === 'rectangle') drawing.beginAt('rectangle', x, y);
   }, [pan, currentTool, marquee, drawing, relativePointer, brush]);
@@ -333,7 +345,7 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageUrl, width, hei
       </div>
 
       <div className="absolute bottom-3 left-3 z-10 text-[11px] text-slate-500 bg-white/80 backdrop-blur-sm px-2 py-1 rounded border border-slate-200 pointer-events-none">
-        Scroll = zoom · Space+drag or middle-drag = pan · 0 = fit · 1 = 100% · Shift+F = zoom to selection
+        Scroll = zoom · Left-drag = pan · Shift+drag = marquee select · Space+drag = pan · 0 = fit · 1 = 100% · Shift+F = zoom to selection
       </div>
     </div>
   );

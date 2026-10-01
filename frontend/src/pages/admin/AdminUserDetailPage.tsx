@@ -20,6 +20,11 @@ export const AdminUserDetailPage: React.FC = () => {
   };
   useEffect(() => { refresh(); }, [id]);
 
+  const [sessions, setSessions] = useState<any[]>([]);
+  useEffect(() => {
+    adminApi.listUserSessions(id).then(setSessions);
+  }, [id, busy]);
+
   if (loading) return <div className="p-8 text-slate-500">Loading…</div>;
   if (!u) return null;
 
@@ -61,10 +66,6 @@ export const AdminUserDetailPage: React.FC = () => {
     catch (e: any) { alert(e?.response?.data?.detail ?? 'Failed'); setBusy(false); }
   };
 
-  const [sessions, setSessions] = useState<any[]>([]);
-  useEffect(() => {
-    adminApi.listUserSessions(id).then(setSessions);
-  }, [id, busy]);
 
   const killSession = async (sessionId: number) => {
     if (!window.confirm('End this session?')) return;
@@ -104,10 +105,10 @@ export const AdminUserDetailPage: React.FC = () => {
       <div className="flex items-start justify-between mb-6">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-full bg-indigo-600 text-white flex items-center justify-center text-lg font-semibold">
-            {(u.full_name ?? u.username).slice(0, 2).toUpperCase()}
+            {(u.full_name || u.username || 'U').slice(0, 2).toUpperCase()}
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-slate-900">{u.full_name ?? u.username}</h1>
+            <h1 className="text-xl font-semibold text-slate-900">{u.full_name || u.username || 'Unknown User'}</h1>
             <div className="text-sm text-slate-500">{u.email}</div>
           </div>
         </div>
@@ -116,10 +117,10 @@ export const AdminUserDetailPage: React.FC = () => {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Projects', value: u.project_count },
-          { label: 'Tasks', value: u.task_count },
-          { label: 'Annotations', value: u.annotation_count.toLocaleString() },
-          { label: 'Active sessions', value: u.active_sessions },
+          { label: 'Projects', value: u.project_count || 0 },
+          { label: 'Tasks', value: u.task_count || 0 },
+          { label: 'Annotations', value: (u.annotation_count || 0).toLocaleString() },
+          { label: 'Active sessions', value: u.active_sessions || 0 },
         ].map((s) => (
           <div key={s.label} className="bg-white border border-slate-200 rounded-lg p-4">
             <div className="text-xs text-slate-500">{s.label}</div>
@@ -182,13 +183,13 @@ export const AdminUserDetailPage: React.FC = () => {
       {/* Active Sessions */}
       <section className="bg-white border border-slate-200 rounded-lg p-4 mt-4">
         <h2 className="font-medium text-slate-900 mb-3">
-          Active sessions <span className="text-slate-400 text-sm">({sessions.filter((s) => s.is_active).length})</span>
+          Active sessions <span className="text-slate-400 text-sm">({(sessions || []).filter((s) => s.is_active).length})</span>
         </h2>
-        {sessions.length === 0 && (
+        {(!sessions || sessions.length === 0) && (
           <p className="text-sm text-slate-500">No sessions on record.</p>
         )}
         <ul className="divide-y divide-slate-100">
-          {sessions.map((s) => (
+          {(sessions || []).map((s) => (
             <li key={s.id} className="py-3 flex items-center gap-3 text-sm">
               <span className={`w-2 h-2 rounded-full ${s.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
               <div className="flex-1 min-w-0">

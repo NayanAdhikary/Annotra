@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { mlApi, MLModel, InferenceJob, MappingSuggestion } from '../../api/ml';
+import { mlApi } from '../../api/ml';
+import type { MLModel, InferenceJob, MappingSuggestion } from '../../api/ml';
 import { labelsApi } from '../../api/labels';
 import type { Label } from '../../types/annotation';
 
