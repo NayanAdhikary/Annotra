@@ -31,6 +31,14 @@ export const MaskKonvaShape: React.FC<Props> = ({ annotation, label, selected, o
       ctx.fillStrokeShape(shape);
     }}
     onClick={onSelect}
+    onMouseEnter={(e) => {
+      e.target.getStage()!.container().style.cursor = 'pointer';
+      e.target.opacity(0.85);
+    }}
+    onMouseLeave={(e) => {
+      e.target.getStage()!.container().style.cursor = '';
+      e.target.opacity(1);
+    }}
     hitFunc={(ctx, shape) => {
       try {
         const rle = JSON.parse(annotation.points[0] as any);

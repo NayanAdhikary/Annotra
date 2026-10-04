@@ -21,4 +21,7 @@ export const imagesApi = {
     });
     return data;
   },
+  delete: async (taskId: number, imageId: number): Promise<void> => {
+    await api.delete(`/api/tasks/${taskId}/images/${imageId}`);
+  },
 };

@@ -32,6 +32,8 @@ export const TaskSetupPage: React.FC = () => {
     const [showExport, setShowExport] = useState(false);
     const [showImport, setShowImport] = useState(false);
     const [showPredict, setShowPredict] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const user = useAuthStore((s) => s.user);
     const canPredict = user && ['admin', 'manager'].includes(user.role);
     
@@ -58,8 +60,11 @@ export const TaskSetupPage: React.FC = () => {
                 const imgs = await imagesApi.list(id);
                 setImages(imgs);
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
+            setError(e.message || 'Failed to load task');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -96,6 +101,14 @@ export const TaskSetupPage: React.FC = () => {
         }
     };
 
+    if (isLoading) {
+        return <div className="max-w-6xl mx-auto p-8 pb-20 text-center text-slate-500">Loading task...</div>;
+    }
+
+    if (error || !task) {
+        return <div className="max-w-6xl mx-auto p-8 pb-20 text-center text-red-500">{error || 'Task not found.'}</div>;
+    }
+
     return (
         <div className="max-w-6xl mx-auto p-8 pb-20">
             <div className="flex justify-between items-center mb-8 border-b border-slate-200 pb-6">
@@ -121,6 +134,12 @@ export const TaskSetupPage: React.FC = () => {
                                 className="px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50">
                             Export
                         </button>
+                        <Link
+                          to={`/tasks/${id}/tool-setup`}
+                          className="px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50 flex items-center gap-1"
+                        >
+                          🔧 Tool setup
+                        </Link>
                         <button onClick={handleDeleteTask}
                                 className="px-3 py-1.5 text-sm border border-red-300 text-red-700 rounded-md hover:bg-red-50">
                             Delete task
@@ -203,7 +222,16 @@ export const TaskSetupPage: React.FC = () => {
                                         <p className="text-slate-500 text-sm">Use the uploader above to add images.</p>
                                     </div>
                                 ) : (
-                                    <ImageGrid images={images} onOpen={() => navigate(`/tasks/${id}`)} />
+                                    <ImageGrid 
+                                      images={images} 
+                                      onOpen={() => navigate(`/tasks/${id}`)}
+                                      onDelete={async (img) => {
+                                        if (confirm('Are you sure you want to delete this image?')) {
+                                          await imagesApi.delete(id!, img.id);
+                                          loadData();
+                                        }
+                                      }}
+                                    />
                                 )}
                             </div>
                         </>

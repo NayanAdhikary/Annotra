@@ -32,7 +32,7 @@ from app.schemas.admin import (
 )
 from app.schemas.project import QualityRow, QualityReport
 from app.routers.projects import _task_stats
-from app.core.security import hash_password, generate_refresh_token
+from app.core.security import generate_refresh_token
 
 router = APIRouter()
 ADMIN_ONLY = Depends(require_role(UserRole.ADMIN))
@@ -61,7 +61,8 @@ async def system_stats(db: AsyncSession = Depends(get_db), _: User = ADMIN_ONLY)
 
         # Storage: sum sizes of the images directory
         total_bytes = 0
-        for root, _, files in os.walk("/data/images"):
+        from app.config import settings
+        for root, _, files in os.walk(os.path.join(settings.DATA_DIR, "images")):
             for f in files:
                 try:
                     total_bytes += os.path.getsize(os.path.join(root, f))
@@ -781,7 +782,7 @@ async def review_annotations(
 async def list_user_sessions(
     user_id: int, db: AsyncSession = Depends(get_db), _: User = ADMIN_ONLY,
 ):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     rows = (await db.execute(
         select(RefreshToken)
         .where(RefreshToken.user_id == user_id)
@@ -797,7 +798,7 @@ async def list_user_sessions(
             "revoked_at": r.revoked_at,
             "user_agent": r.user_agent,
             "ip_address": r.ip_address,
-            "is_active": r.revoked_at is None and r.expires_at > now,
+            "is_active": r.revoked_at is None and (r.expires_at.replace(tzinfo=None) > now),
         }
         for r in rows
     ]
@@ -1243,12 +1244,12 @@ async def quality_report(
 
 from fastapi import UploadFile, File
 from typing import List
-import os, uuid, io
+import uuid, io
 from PIL import Image as PILImage
 
 
-import sys as _sys
-_DATA_DIR_ADMIN = os.environ.get("DATA_DIR", "/data" if _sys.platform != "win32" else os.path.join(os.getcwd(), "data"))
+from app.config import settings
+_DATA_DIR_ADMIN = settings.DATA_DIR
 
 ALLOWED_IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 UPLOAD_ROOT = os.path.join(_DATA_DIR_ADMIN, "images")
@@ -1337,6 +1338,7 @@ async def bulk_upload_videos(
     from app.workers.video_worker import extract_video_frames
 
     video_root = os.path.join(_DATA_DIR_ADMIN, "videos")
+    frames_root = os.path.join(_DATA_DIR_ADMIN, "frames")
     os.makedirs(os.path.join(video_root, str(task_id)), exist_ok=True)
 
     created = []
@@ -1363,7 +1365,7 @@ async def bulk_upload_videos(
         )
         db.add(video)
         await db.flush()
-        video.frames_dir = f"/data/frames/{video.id}"
+        video.frames_dir = os.path.join(frames_root, str(video.id))
         os.makedirs(video.frames_dir, exist_ok=True)
         created.append(video.id)
 
@@ -1374,7 +1376,6 @@ async def bulk_upload_videos(
     return {"video_ids": created, "count": len(created)}
 
 
-from app.models.task_assignment import TaskAssignment
 from sqlalchemy import delete as sql_delete
 
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Toolbar } from '../components/Toolbar/Toolbar';
 import { HistoryControls } from '../components/Toolbar/HistoryControls';
 import { AnnotationCanvas } from '../components/canvas/AnnotationCanvas';
@@ -30,11 +30,15 @@ import { tasksApi } from '../api/tasks';
 import { useCopyPaste } from '../hooks/useCopyPaste';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { useZoomToSelection } from '../hooks/useZoomToSelection';
+import { toolConfigApi } from '../api/toolConfig';
+import { useToolConfig } from '../store/toolConfigStore';
+import { ToolTip } from '../components/canvas/ToolTip';
 
 export const AnnotatePage: React.FC = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const id = parseInt(taskId || '0', 10);
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const initialTab = (searchParams.get('tab') as 'objects' | 'comments' | 'review') ?? 'objects';
 
   const { setTask, setLabels, setAnnotations, setFrame, frame, taskId: storeTaskId, setTaskStatus } =
@@ -50,6 +54,17 @@ export const AnnotatePage: React.FC = () => {
   const refreshKey = annCount;
   const [imageStatus, setImageStatus] = useState<string>('pending');
   const [progress, setProgress] = useState<any>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      setToastMsg(e.detail);
+      const timer = setTimeout(() => setToastMsg(null), 5000);
+      return () => clearTimeout(timer); // If new event arrives before 5s
+    };
+    window.addEventListener('annotra-toast', handler);
+    return () => window.removeEventListener('annotra-toast', handler);
+  }, []);
 
   const currentImageId = images.length > 0 ? images[Math.min(frame, images.length - 1)]?.id : undefined;
 
@@ -73,6 +88,15 @@ export const AnnotatePage: React.FC = () => {
       setTaskStatus(t.status);
     }).catch(e => console.error(e));
   }, [id, setTaskStatus]);
+  
+  const loadConfig = useToolConfig((s) => s.load);
+  const config = useToolConfig((s) => s.config);
+  useEffect(() => {
+    toolConfigApi.effective(id).then((cfg) => {
+      loadConfig(cfg);
+      useAnnotationStore.getState().setBrushSize(cfg.brush_size_default);
+    }).catch(console.error);
+  }, [id, loadConfig]);
   
   const [rejectedCount, setRejectedCount] = useState(0);
 
@@ -110,7 +134,7 @@ export const AnnotatePage: React.FC = () => {
     setTask(id);
   }, [id, storeTaskId, setTask]);
 
-  const { labels } = useAnnotationStore.getState();
+  const { labels } = useAnnotationStore();
 
   useEffect(() => {
     let cancelled = false;
@@ -123,6 +147,16 @@ export const AnnotatePage: React.FC = () => {
         ]);
         if (cancelled) return;
         setTaskData(taskRes);
+
+        if (taskRes.task_type === 'video') {
+          const { api } = await import('../api/client');
+          const { data: videos } = await api.get(`/api/tasks/${id}/videos`);
+          if (videos && videos.length > 0) {
+            navigate(`/tasks/${id}/videos/${videos[0].id}`);
+            return;
+          }
+        }
+
         setLabels(labels);
         setImages(imgs);
       } catch (e) {
@@ -265,6 +299,21 @@ export const AnnotatePage: React.FC = () => {
 
   const current = images[Math.min(frame, images.length - 1)];
 
+  // Guard: if images haven't loaded yet or frame is out of sync, show a spinner
+  if (!current) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-500 font-medium">
+        <div className="flex flex-col items-center gap-3">
+          <svg className="w-8 h-8 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          Loading image…
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-slate-100">
       {labels.length === 0 && (
@@ -292,8 +341,13 @@ export const AnnotatePage: React.FC = () => {
           <div className="h-6 w-px bg-slate-200"></div>
           <div>
             <h1 className="text-sm font-semibold text-slate-900 leading-tight">{taskData?.name || `Task #${id}`}</h1>
-            <p className="text-xs text-slate-500 font-medium">
+            <p className="text-xs text-slate-500 font-medium flex items-center gap-2">
               {taskData?.annotated_count ?? 0} / {taskData?.image_count ?? images.length} annotated
+              {useAnnotationStore((s) => s.selectedIds).length > 1 && (
+                <span className="text-xs text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded">
+                  {useAnnotationStore.getState().selectedIds.length} selected
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -366,22 +420,25 @@ export const AnnotatePage: React.FC = () => {
 
       {/* Shortcuts bar */}
       <div className="px-4 py-1.5 text-[11px] text-slate-500 border-b border-slate-200 bg-slate-50 flex flex-wrap gap-x-6 gap-y-1 font-medium shrink-0">
-        <div><b>Draw:</b> R rect · P polygon · L line · K points · B brush · E eraser</div>
-        <div><b>Select:</b> V · Shift+click multi · Tab next · Shift+Tab prev</div>
+        <div>
+          <b>Draw:</b>{' '}
+          {config?.enabled_tools.map((t) => `${config.shortcuts[t]?.toUpperCase() || '?'} ${t}`).join(' · ')}
+        </div>
+        <div>
+          <b>Select:</b> {config?.shortcuts['select']?.toUpperCase() || 'V'} · Shift+click multi · Tab next · Shift+Tab prev
+        </div>
         <div><b>Edit:</b> Ctrl+Z undo · Ctrl+C/V copy/paste</div>
         <div><b>View:</b> Scroll zoom · Space+drag pan · 0 fit · 1 100% · Shift+F zoom to selection</div>
         <div><b>Review:</b> A accept · R reject · F fix · N next pending · <span><b>Shift+A</b> accept ML predictions on frame</span></div>
       </div>
 
+      <Toolbar onManageLabels={() => setShowLabelManager(true)} />
+
       {/* Main Workspace */}
       <div className="flex flex-1 overflow-hidden">
-        <Toolbar vertical />
         {/* Canvas Area */}
-        <div className="flex-1 flex items-center justify-center bg-slate-100 overflow-auto p-8">
-          <div
-            className="bg-white border border-slate-300 shadow-md rounded-sm overflow-hidden"
-            style={{ width: current.width, height: current.height }}
-          >
+        <div className="flex-1 flex items-stretch justify-stretch bg-slate-100 overflow-hidden relative">
+          <div className="flex-1 bg-white border border-slate-300 shadow-md relative">
             <AnnotationCanvas
               taskId={id}
               imageId={currentImageId ?? null}
@@ -395,6 +452,8 @@ export const AnnotatePage: React.FC = () => {
         {/* Sidebar */}
         <WorkspaceSidebar taskId={id} initialTab={initialTab} />
       </div>
+
+      <ToolTip />
 
       {taskStatus === 'annotation' ? (
         <AnnotatorActions
@@ -436,6 +495,12 @@ export const AnnotatePage: React.FC = () => {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
           </button>
         </footer>
+      )}
+
+      {toastMsg && (
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm px-4 py-2 rounded-full shadow-lg z-50 pointer-events-none transition-opacity">
+          {toastMsg}
+        </div>
       )}
 
     </div>

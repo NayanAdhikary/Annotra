@@ -10,7 +10,7 @@ from app.services.video import probe_video, extract_frames
 def extract_video_frames(self, video_id: int):
     from app.models.video import VideoAsset
 
-    sync_dsn = settings.DATABASE_URL.replace("+asyncpg", "")
+    sync_dsn = settings.DATABASE_URL.replace("+asyncpg", "").replace("+aiosqlite", "")
     engine = create_engine(sync_dsn)
 
     with Session(engine) as db:

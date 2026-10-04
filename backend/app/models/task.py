@@ -1,4 +1,3 @@
-from fastapi import status
 from sqlalchemy import Column, Integer, BigInteger, String, ForeignKey, DateTime, func, Boolean, Text, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.core.database import Base

@@ -3,10 +3,7 @@ def rle_to_polygon(rle: dict) -> list[float] | None:
     Convert a COCO-style RLE to a polygon outline. Uses a simple marching-squares
     trace. Returns a flat list of x,y coords, or None if the mask is degenerate.
     """
-    try:
-        from pycocotools import mask as mask_util
-    except ImportError:
-        return None
+
     import numpy as np
     from skimage import measure
 

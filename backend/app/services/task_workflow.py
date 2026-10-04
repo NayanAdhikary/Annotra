@@ -3,7 +3,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.task import Task
-from app.models.user import User, UserRole
+from app.models.user import User
 
 
 # Allowed transitions. Key = current status, value = set of next statuses.

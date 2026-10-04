@@ -1,6 +1,6 @@
 import json
 import hashlib
-from typing import Any, Optional, Callable, Awaitable
+from typing import Any, Callable, Awaitable
 from app.core.rate_limit import get_redis
 
 

@@ -10,7 +10,7 @@ async def main():
         res = await conn.execute(text("SELECT id, email, role FROM users LIMIT 1"))
         user = res.fetchone()
         if user:
-            token = create_access_token(data={"sub": str(user.id), "role": user.role})
+            token = create_access_token(user_id=user.id, role=user.role)
             print(token)
         else:
             print("No users found")

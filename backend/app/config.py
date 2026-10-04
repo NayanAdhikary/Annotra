@@ -1,3 +1,5 @@
+import os
+import sys
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -7,8 +9,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     REDIS_URL: str = "redis://localhost:6379/0"
+    DATA_DIR: str = os.environ.get("DATA_DIR", "/data" if sys.platform != "win32" else os.path.join(os.getcwd(), "data"))
 
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174"
     STORAGE_BACKEND: str = "local"
     S3_ENDPOINT: str = ""
     S3_BUCKET: str = ""

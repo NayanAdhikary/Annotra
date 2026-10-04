@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { annotatorApi, TaskProgress } from '../../api/annotator';
+import { annotatorApi, type TaskProgress } from '../../api/annotator';
 
 interface Props {
   taskId: number;

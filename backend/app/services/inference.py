@@ -106,7 +106,7 @@ def run_inference(
 def _mask_to_polygon(mask_tensor) -> Optional[List[float]]:
     try:
         import cv2
-        import numpy as np
+
 
         mask = mask_tensor.cpu().numpy().astype("uint8")
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

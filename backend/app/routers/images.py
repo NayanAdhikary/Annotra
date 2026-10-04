@@ -21,9 +21,8 @@ async def _assert_can_edit_task(db: AsyncSession, task_id: int, user: User) -> T
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not your project")
     return task
 
-import sys
-
-_DATA_DIR = os.environ.get("DATA_DIR", "/data" if sys.platform != "win32" else os.path.join(os.getcwd(), "data"))
+from app.config import settings
+_DATA_DIR = settings.DATA_DIR
 UPLOAD_ROOT = os.path.join(_DATA_DIR, "images")
 ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
@@ -45,7 +44,7 @@ async def upload_image(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    task = await _assert_can_edit_task(db, task_id, user)
+    await _assert_can_edit_task(db, task_id, user)
 
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED_EXT:
@@ -98,3 +97,27 @@ async def list_images(task_id: int, db: AsyncSession = Depends(get_db)):
         }
         for a in assets
     ]
+
+
+@router.delete("/tasks/{task_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_image(
+    task_id: int,
+    image_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    await _assert_can_edit_task(db, task_id, user)
+    
+    asset = await db.get(ImageAsset, image_id)
+    if not asset or asset.task_id != task_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
+        
+    # Remove file from disk
+    try:
+        if os.path.exists(asset.storage_path):
+            os.remove(asset.storage_path)
+    except Exception:
+        pass
+        
+    await db.delete(asset)
+    await db.commit()

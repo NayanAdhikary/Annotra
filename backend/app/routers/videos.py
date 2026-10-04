@@ -19,8 +19,10 @@ from app.workers.video_worker import extract_video_frames
 
 router = APIRouter()
 
-VIDEO_ROOT = "/data/videos"
-FRAME_ROOT = "/data/frames"
+from app.config import settings
+
+VIDEO_ROOT = os.path.join(settings.DATA_DIR, "videos")
+FRAME_ROOT = os.path.join(settings.DATA_DIR, "frames")
 ALLOWED_VIDEO_EXT = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 
 

@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { Rect } from 'react-konva';
 import type Konva from 'konva';
 import { useAnnotationStore } from '../../../store/annotationStore';
+import { useViewportStore } from '../../../store/viewportStore';
 import type { Annotation, Label } from '../../../types/annotation';
 import { useHistoryStore } from '../../../store/historyStore';
 import { ReplacePointsCommand } from '../../../commands/AnnotationCommands';
@@ -18,6 +19,7 @@ export const RectShape: React.FC<Props> = ({ annotation, label, selected, nodeRe
   const ref = useRef<Konva.Rect>(null);
   const replaceAnnotation = useAnnotationStore((s) => s.replaceAnnotation);
   const execute = useHistoryStore((s) => s.execute);
+  const scale = useViewportStore((s) => s.scale);
   const dragStartRef = useRef<number[] | null>(null);
 
   // Register node for the Transformer to attach to
@@ -45,9 +47,20 @@ export const RectShape: React.FC<Props> = ({ annotation, label, selected, nodeRe
       strokeWidth={selected ? 2.5 : 2}
       strokeScaleEnabled={false}
       fill={label?.color ? `${label.color}22` : 'rgba(255,0,0,0.08)'}
-      hitStrokeWidth={8}
+      shadowColor={label?.color ?? '#00E5FF'}
+      shadowBlur={selected ? 8 : 0}
+      shadowOpacity={selected ? 0.5 : 0}
+      hitStrokeWidth={8 / scale}
       draggable
       onClick={onSelect}
+      onMouseEnter={(e) => {
+        e.target.getStage()!.container().style.cursor = 'pointer';
+        e.target.opacity(0.85);
+      }}
+      onMouseLeave={(e) => {
+        e.target.getStage()!.container().style.cursor = '';
+        e.target.opacity(1);
+      }}
       onDragStart={() => { dragStartRef.current = [...annotation.points]; }}
       onDragEnd={(e) => {
         // Dragging the whole rect: translate all 4 coords by delta.

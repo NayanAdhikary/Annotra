@@ -19,7 +19,10 @@ from app.services.audit import audit
 from app.workers.inference_worker import run_inference_job
 
 router = APIRouter()
-MODEL_ROOT = "/data/models"
+import os
+from app.config import settings
+
+MODEL_ROOT = os.path.join(settings.DATA_DIR, "models")
 os.makedirs(MODEL_ROOT, exist_ok=True)
 
 ADMIN_ONLY = Depends(require_role(UserRole.ADMIN, UserRole.MANAGER))

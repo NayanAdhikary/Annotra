@@ -45,7 +45,7 @@ async def create_label(task_id: int, payload: LabelCreate,
                        db: AsyncSession = Depends(get_db),
                        user: User = Depends(get_current_user)):
     # Ensure task exists and user can edit it
-    t = await _assert_can_edit_task(db, task_id, user)
+    await _assert_can_edit_task(db, task_id, user)
 
     # Reject duplicate names within the task
     dup = await db.execute(

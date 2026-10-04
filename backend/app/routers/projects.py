@@ -226,14 +226,20 @@ async def _task_response(db: AsyncSession, t: Task) -> TaskResponse:
     assigns = (await db.execute(
         select(TaskAssignment).where(TaskAssignment.task_id == t.id)
     )).scalars().all()
-    assignees = []
-    for a in assigns:
-        u = await db.get(User, a.user_id)
-        assignees.append({
+    # Batch-load all assignee users in a single query (no N+1)
+    assign_user_ids = [a.user_id for a in assigns]
+    users_map: dict = {}
+    if assign_user_ids:
+        rows = (await db.execute(select(User).where(User.id.in_(assign_user_ids)))).scalars().all()
+        users_map = {u.id: u for u in rows}
+    assignees = [
+        {
             "user_id": a.user_id, "role": a.role,
-            "name": (u.full_name or u.username) if u else None,
-            "email": u.email if u else None,
-        })
+            "name": ((u := users_map.get(a.user_id)) and (u.full_name or u.username)) or None,
+            "email": users_map.get(a.user_id) and users_map[a.user_id].email or None,
+        }
+        for a in assigns
+    ]
 
     last_note = (await db.execute(
         select(TaskComment)

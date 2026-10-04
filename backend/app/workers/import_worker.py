@@ -10,14 +10,15 @@ from sqlalchemy.orm import Session
 from app.workers import celery_app
 from app.config import settings
 
-UPLOAD_ROOT = "/data/imports"
+import os
+UPLOAD_ROOT = os.path.join(settings.DATA_DIR, "imports")
 os.makedirs(UPLOAD_ROOT, exist_ok=True)
 
 
 @celery_app.task(bind=True, name="import.run", max_retries=0)
 def run_import(self, job_id: int):
     from app.models.export_job import ImportJob
-    from app.models.task import Task, Label, ImageAsset
+    from app.models.task import Label, ImageAsset
     from app.models.annotation import Annotation
     from app.services.importers import (
         parse_coco, parse_yolo, parse_voc, parse_cvat,

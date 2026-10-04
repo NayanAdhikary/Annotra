@@ -25,7 +25,8 @@ from app.workers.export_worker import build_export
 from app.workers.import_worker import run_import
 
 router = APIRouter()
-IMPORT_ROOT = "/data/imports"
+from app.config import settings
+IMPORT_ROOT = os.path.join(settings.DATA_DIR, "imports")
 
 
 async def _task_guard(db: AsyncSession, task_id: int, user: User) -> Task:

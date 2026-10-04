@@ -7,8 +7,8 @@ from app.core.database import Base
 class VideoAsset(Base):
     __tablename__ = "video_assets"
 
-    id                 = Column(BigInteger, primary_key=True)
-    task_id            = Column(BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"),
+    id                 = Column(Integer, primary_key=True, autoincrement=True)
+    task_id            = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"),
                                 nullable=False, index=True)
     filename           = Column(String(500), nullable=False)
     storage_path       = Column(String(1000), nullable=False)

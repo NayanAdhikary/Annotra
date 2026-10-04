@@ -1,5 +1,6 @@
 import React from 'react';
 import { Line, Circle } from 'react-konva';
+import { useViewportStore } from '../../../store/viewportStore';
 import type { Annotation, Label } from '../../../types/annotation';
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export const PolyShape: React.FC<Props> = ({ annotation, label, selected, onSelect }) => {
+  const scale = useViewportStore((s) => s.scale);
   const isClosed = annotation.shapeType === 'polygon';
   const color = label?.color ?? '#FF0000';
 
@@ -22,8 +24,19 @@ export const PolyShape: React.FC<Props> = ({ annotation, label, selected, onSele
         strokeWidth={selected ? 2.5 : 2}
         strokeScaleEnabled={false}
         fill={isClosed ? `${color}22` : undefined}
-        hitStrokeWidth={10}
+        shadowColor={color}
+        shadowBlur={selected ? 8 : 0}
+        shadowOpacity={selected ? 0.5 : 0}
+        hitStrokeWidth={10 / scale}
         onClick={onSelect}
+        onMouseEnter={(e) => {
+          e.target.getStage()!.container().style.cursor = 'pointer';
+          e.target.opacity(0.85);
+        }}
+        onMouseLeave={(e) => {
+          e.target.getStage()!.container().style.cursor = '';
+          e.target.opacity(1);
+        }}
       />
       {/* Small non-interactive vertex dots for visual feedback on unselected shapes */}
       {!selected &&

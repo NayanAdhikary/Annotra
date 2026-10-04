@@ -12,6 +12,7 @@ const RegisterPage = React.lazy(() => import('./pages/RegisterPage').then(m => (
 const ProjectsPage = React.lazy(() => import('./pages/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
 const ProjectDetailPage = React.lazy(() => import('./pages/ProjectDetailPage').then(m => ({ default: m.ProjectDetailPage })));
 const TaskSetupPage = React.lazy(() => import('./pages/TaskSetupPage').then(m => ({ default: m.TaskSetupPage })));
+const TaskToolSetupPage = React.lazy(() => import('./pages/TaskToolSetupPage').then(m => ({ default: m.TaskToolSetupPage })));
 const AnnotatePage = React.lazy(() => import('./pages/AnnotatePage').then(m => ({ default: m.AnnotatePage })));
 const VideoAnnotatePage = React.lazy(() => import('./pages/VideoAnnotatePage').then(m => ({ default: m.VideoAnnotatePage })));
 const MyTasksPage = React.lazy(() => import('./pages/MyTaskPage').then(m => ({ default: m.MyTasksPage })));
@@ -31,6 +32,7 @@ const AdminSettingsPage = React.lazy(() => import('./pages/AdminSettingsPage').t
 const AdminNotificationsPage = React.lazy(() => import('./pages/admin/AdminNotificationsPage').then(m => ({ default: m.AdminNotificationsPage })));
 const AdminProjectDetailPage = React.lazy(() => import('./pages/admin/AdminProjectDetailPage').then(m => ({ default: m.AdminProjectDetailPage })));
 const AdminModelsPage = React.lazy(() => import('./pages/admin/AdminModelsPage').then(m => ({ default: m.AdminModelsPage })));
+const AdminToolSetupPage = React.lazy(() => import('./pages/admin/AdminToolSetupPage').then(m => ({ default: m.AdminToolSetupPage })));
 
 const SuspenseWrapper = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<div className="p-8 text-slate-500">Loading...</div>}>
@@ -69,6 +71,11 @@ export const App: React.FC = () => {
         } />
         <Route path="/tasks/:taskId/setup" element={
           <ProtectedRoute><AppLayout><SuspenseWrapper><TaskSetupPage /></SuspenseWrapper></AppLayout></ProtectedRoute>
+        } />
+        <Route path="/tasks/:taskId/tool-setup" element={
+          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+            <AppLayout><SuspenseWrapper><TaskToolSetupPage /></SuspenseWrapper></AppLayout>
+          </ProtectedRoute>
         } />
 
         {/* Workspace — full-screen, no layout */}
@@ -143,6 +150,11 @@ export const App: React.FC = () => {
         <Route path="/admin/models" element={
           <ProtectedRoute allowedRoles={['admin', 'manager']}>
             <AdminLayout><SuspenseWrapper><AdminModelsPage /></SuspenseWrapper></AdminLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/tool-setup" element={
+          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+            <AdminLayout><SuspenseWrapper><AdminToolSetupPage /></SuspenseWrapper></AdminLayout>
           </ProtectedRoute>
         } />
 

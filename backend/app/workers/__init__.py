@@ -16,6 +16,7 @@ celery_app.conf.update(
     accept_content=["json"],
     timezone="UTC",
     enable_utc=True,
+    task_always_eager=True,
     task_track_started=True,
     worker_max_tasks_per_child=50,
     task_routes={

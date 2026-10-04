@@ -34,8 +34,19 @@ export const PointsShape: React.FC<Props> = ({ annotation, label, selected, onSe
           stroke={selected ? '#00E5FF' : '#000'}
           strokeWidth={selected ? 2 : 1}
           strokeScaleEnabled={false}
+          shadowColor={color}
+          shadowBlur={selected ? 8 : 0}
+          shadowOpacity={selected ? 0.5 : 0}
           draggable={selected}
           onClick={onSelect}
+          onMouseEnter={(e) => {
+            e.target.getStage()!.container().style.cursor = 'pointer';
+            e.target.opacity(0.85);
+          }}
+          onMouseLeave={(e) => {
+            e.target.getStage()!.container().style.cursor = '';
+            e.target.opacity(1);
+          }}
           onDragMove={(e) => moveVertex(i, e.target.x(), e.target.y())}
         />
       ))}

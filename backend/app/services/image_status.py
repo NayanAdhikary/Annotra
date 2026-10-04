@@ -1,4 +1,3 @@
-from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select

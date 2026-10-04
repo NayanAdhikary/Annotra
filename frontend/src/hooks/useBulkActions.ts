@@ -3,7 +3,8 @@ import { annotationsApi } from '../api/annotations';
 import { useAnnotationStore } from '../store/annotationStore';
 import { useSaveStatus } from './useSaveStatus';
 import { useHistoryStore } from '../store/historyStore';
-import { ChangeLabelCommand, ToggleOccludedCommand } from '../commands/AnnotationCommands';
+import { ChangeLabelCommand, ToggleOccludedCommand, DeleteManyCommand } from '../commands/AnnotationCommands';
+import { useToolConfig } from '../store/toolConfigStore';
 
 /**
  * Keyboard-driven bulk actions:
@@ -75,6 +76,29 @@ export function useBulkActions(taskId: number | null) {
             }),
           ).catch(() => {
              useHistoryStore.getState().undo();
+          });
+        }
+      }
+
+      // ---- Delete ----
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const confirmBulk = useToolConfig.getState().config?.confirm_bulk_delete;
+        if (selected.length > 1 && confirmBulk) {
+          if (!window.confirm(`Delete ${selected.length} shapes?`)) return;
+        }
+
+        e.preventDefault();
+        useHistoryStore.getState().execute(new DeleteManyCommand(selected));
+
+        window.dispatchEvent(
+          new CustomEvent('annotra-toast', {
+            detail: `Deleted ${selected.length} shape${selected.length === 1 ? '' : 's'} · Ctrl+Z to undo`,
+          })
+        );
+
+        if (serverIds.length) {
+          wrap(() => annotationsApi.bulkDelete(taskId, serverIds)).catch(() => {
+            useHistoryStore.getState().undo();
           });
         }
       }

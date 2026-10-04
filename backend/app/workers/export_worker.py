@@ -1,4 +1,3 @@
-import json
 import os
 import shutil
 import zipfile
@@ -10,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.workers import celery_app
 from app.config import settings
 
-EXPORT_ROOT = "/data/exports"
+EXPORT_ROOT = os.path.join(settings.DATA_DIR, "exports")
 os.makedirs(EXPORT_ROOT, exist_ok=True)
 
 

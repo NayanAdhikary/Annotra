@@ -1,5 +1,4 @@
 from sqlalchemy import null
-from unicodedata import category
 from sqlalchemy import Column, String, DateTime, ForeignKey, func, Text
 from app.core.database import Base
 

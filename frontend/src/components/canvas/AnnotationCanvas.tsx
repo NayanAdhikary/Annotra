@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
-import { Stage, Layer, Image as KonvaImage } from 'react-konva';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useMemo, useState } from 'react';
+import { Stage, Layer, Image as KonvaImage, Circle as KonvaCircle } from 'react-konva';
 import useImage from 'use-image';
 import type Konva from 'konva';
 import { useAnnotationStore } from '../../store/annotationStore';
@@ -22,6 +22,8 @@ import { useSaveStatus } from '../../hooks/useSaveStatus';
 import type { Annotation } from '../../types/annotation';
 import { useHistoryStore } from '../../store/historyStore';
 import { AddAnnotationCommand } from '../../commands/AnnotationCommands';
+import { snapPoint } from '../../lib/snap';
+import { useToolConfig } from '../../store/toolConfigStore';
 
 interface Props {
   taskId: number;
@@ -41,6 +43,7 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
     annotations, labels, selectedIds, currentTool, activeLabelId, frame,
     attachServerId, selectOne, toggleSelect, setTool, taskStatus
   } = useAnnotationStore();
+  const config = useToolConfig((s) => s.config);
 
   const labelById = useMemo(
     () => new Map(labels.map((l) => [l.id, l])),
@@ -56,6 +59,7 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
   const setImageSize = useViewportStore((s) => s.setImageSize);
   const loadTask = useViewportStore((s) => s.loadTask);
   const commitTask = useViewportStore((s) => s.commitTask);
+  const [cursorPos, setCursorPos] = useState<[number, number] | null>(null);
 
   const wrap = useSaveStatus();
   const drawing = useDrawing();
@@ -106,8 +110,19 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
 
   const relativePointer = useCallback((): [number, number] => {
     const pos = stageRef.current?.getRelativePointerPosition();
-    return pos ? [pos.x, pos.y] : [0, 0];
-  }, []);
+    if (!pos) return [0, 0];
+    if (!config) return [pos.x, pos.y];
+
+    return snapPoint(pos.x, pos.y, {
+      snapToGrid: config.snap_to_grid,
+      snapToVertex: config.snap_to_vertex,
+      snapToEdge: config.snap_to_edge,
+      gridSize: config.grid_size,
+      annotations: useAnnotationStore.getState().annotations,
+      currentId: useAnnotationStore.getState().primaryId,
+      scale: live.scale,
+    });
+  }, [config, live.scale]);
 
   const execute = useHistoryStore((s) => s.execute);
 
@@ -173,6 +188,7 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
   const onMouseMove = useCallback(() => {
     if (pan.onMouseMove()) return;
     const [x, y] = relativePointer();
+    setCursorPos([x, y]);
     if (currentTool === 'brush' || currentTool === 'eraser') {
       brush.movePaint(x, y);
       return;
@@ -241,6 +257,22 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
       else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomBy(1 / 1.25); }
       else if (e.key === '0') { e.preventDefault(); fit(); }
       else if (e.key === '1') { e.preventDefault(); zoomTo(1); }
+      else if (e.key === '[') {
+        e.preventDefault();
+        const cfg = useToolConfig.getState().config;
+        if (cfg) {
+          const current = useAnnotationStore.getState().brushSize;
+          useAnnotationStore.getState().setBrushSize(Math.max(cfg.brush_size_min, current - 5));
+        }
+      }
+      else if (e.key === ']') {
+        e.preventDefault();
+        const cfg = useToolConfig.getState().config;
+        if (cfg) {
+          const current = useAnnotationStore.getState().brushSize;
+          useAnnotationStore.getState().setBrushSize(Math.min(cfg.brush_size_max, current + 5));
+        }
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -255,10 +287,36 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
   const s = live.scale;
 
   return (
-    <div ref={containerRef} className="w-full h-full relative overflow-hidden" style={{ cursor: pan.cursor }}>
+    <div
+      ref={containerRef}
+      className="w-full h-full relative overflow-hidden"
+      style={{
+        cursor: pan.cursor,
+        backgroundImage: config?.snap_to_grid
+          ? `linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
+             linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px)`
+          : undefined,
+        backgroundSize: config?.snap_to_grid
+          ? `${config.grid_size * s}px ${config.grid_size * s}px`
+          : undefined,
+        backgroundPosition: config?.snap_to_grid
+          ? `${live.x}px ${live.y}px`
+          : undefined,
+      }}
+    >
       {readOnly && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-md shadow-sm border border-yellow-200 font-medium text-sm">
           This task is {taskStatus}. Editing is disabled.
+        </div>
+      )}
+      {config?.show_shape_count && (
+        <div className="absolute top-2 left-2 bg-white/90 border border-slate-200 text-xs px-2 py-1 rounded pointer-events-none z-20">
+          {visible.length} shape{visible.length === 1 ? '' : 's'}
+        </div>
+      )}
+      {config?.show_coordinates && cursorPos && (
+        <div className="absolute top-2 right-2 bg-slate-900/80 text-white text-[11px] font-mono px-2 py-1 rounded tabular-nums pointer-events-none z-20">
+          {Math.round(cursorPos[0])}, {Math.round(cursorPos[1])}
         </div>
       )}
       <Stage
@@ -316,6 +374,18 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
 
         <Layer listening={false}>
           {marquee.rect && <MarqueeRect rect={marquee.rect} />}
+          {['brush', 'eraser'].includes(currentTool) && cursorPos && (
+            <KonvaCircle
+              x={cursorPos[0]}
+              y={cursorPos[1]}
+              radius={brush.brushSize / 2}
+              stroke="white"
+              strokeWidth={1.5 / s}
+              shadowColor="black"
+              shadowBlur={2 / s}
+              shadowOpacity={0.5}
+            />
+          )}
         </Layer>
       </Stage>
 
