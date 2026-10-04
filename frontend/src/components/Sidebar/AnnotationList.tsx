@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { FixedSizeList as List } from 'react-window';
 import { useAnnotationStore } from '../../store/annotationStore';
 import { annotationsApi } from '../../api/annotations';
 import { useSaveStatus } from '../../hooks/useSaveStatus';
@@ -32,13 +33,19 @@ export const AnnotationList: React.FC = () => {
 
   useEffect(() => { selectOne(null); }, [frame, selectOne]);
 
-  // Auto-scroll selected row into view when primaryId changes from canvas clicks
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerHeight, setContainerHeight] = useState(0);
+
   useEffect(() => {
-    if (primaryId && rowRefs.current[primaryId]) {
-      rowRefs.current[primaryId]!.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
-  }, [primaryId]);
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      setContainerHeight(entries[0].contentRect.height);
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const handleDeleteSelection = async () => {
     const targets = annotations.filter((a) => selectedIds.includes(a.id));
@@ -97,54 +104,64 @@ export const AnnotationList: React.FC = () => {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {visible.map((a) => {
-          const label = labels.find((l) => l.id === a.labelId);
-          const isSel = selectedIds.includes(a.id);
-          return (
-            <div
-              key={a.id}
-              ref={(el) => { rowRefs.current[a.id] = el; }}
-              onClick={() => selectOne(a.id)}
-              className={`px-4 py-2 flex items-center gap-2 cursor-pointer border-l-2 ${
-                isSel ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'
-              }`}
-            >
-              <span className="text-lg leading-none" style={{ color: label?.color ?? '#999' }}>
-                {ICON[a.shapeType]}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate flex items-center gap-2">
-                  {label?.name ?? 'Unlabeled'}
-                  <ReviewBadge status={a.reviewStatus} />
-                  {a.source === 'auto' && (
-                    <span className="text-[9px] px-1 py-0.5 rounded bg-purple-100 text-purple-700 font-medium ml-1">
-                      ML
-                    </span>
-                  )}
+      <div ref={containerRef} className="flex-1 overflow-hidden min-h-0">
+        {visible.length > 0 ? (
+          <List
+            height={containerHeight || 500}
+            itemCount={visible.length}
+            itemSize={56}
+            width="100%"
+          >
+            {({ index, style }) => {
+              const a = visible[index];
+              const label = labels.find((l) => l.id === a.labelId);
+              const isSel = selectedIds.includes(a.id);
+              return (
+                <div
+                  key={a.id}
+                  style={style}
+                  onClick={() => selectOne(a.id)}
+                  className={`px-4 py-2 flex items-center gap-2 cursor-pointer border-l-2 ${
+                    isSel ? 'bg-blue-50 border-blue-500' : 'border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="text-lg leading-none" style={{ color: label?.color ?? '#999' }}>
+                    {ICON[a.shapeType]}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate flex items-center gap-2">
+                      {label?.name ?? 'Unlabeled'}
+                      <ReviewBadge status={a.reviewStatus} />
+                      {a.source === 'auto' && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-purple-100 text-purple-700 font-medium ml-1">
+                          ML
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-gray-500">
+                      #{a.serverId ?? a.id.slice(-4)} · {a.shapeType}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!selectedIds.includes(a.id)) {
+                        selectOne(a.id);
+                        setTimeout(handleDeleteSelection, 0);
+                      } else {
+                        handleDeleteSelection();
+                      }
+                    }}
+                    className="text-gray-400 hover:text-red-600 text-sm"
+                    title="Delete (Del)"
+                  >
+                    ✕
+                  </button>
                 </div>
-                <div className="text-[10px] text-gray-500">
-                  #{a.serverId ?? a.id.slice(-4)} · {a.shapeType}
-                </div>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!selectedIds.includes(a.id)) {
-                    selectOne(a.id);
-                    setTimeout(handleDeleteSelection, 0);
-                  } else {
-                    handleDeleteSelection();
-                  }
-                }}
-                className="text-gray-400 hover:text-red-600 text-sm"
-                title="Delete (Del)"
-              >
-                ✕
-              </button>
-            </div>
-          );
-        })}
+              );
+            }}
+          </List>
+        ) : null}
 
         {visible.length === 0 && (
           <p className="text-xs text-gray-400 text-center py-8">
