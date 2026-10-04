@@ -33,7 +33,8 @@ async def list_notifications(
         "unread": unread,
         "items": [
             {
-                "id": n.id, "kind": n.kind, "title": n.title, "body": n.body,
+                "id": n.id, "kind": n.kind,
+                "title": n.title, "body": n.body,
                 "link": n.link, "read": n.read_at is not None,
                 "resource_type": n.resource_type, "resource_id": n.resource_id,
                 "created_at": n.created_at.isoformat(),

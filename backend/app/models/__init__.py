@@ -11,6 +11,7 @@ from app.models.export_job import ExportJob, ImportJob
 from app.models.notification import Notification
 from app.models.annotation_comment import AnnotationComment
 from app.models.ml_model import MLModel, InferenceJob
+from app.models.tool_config import ToolConfig, UserPreferences
 
 __all__ = [
     "MLModel",

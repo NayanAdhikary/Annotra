@@ -66,6 +66,22 @@ async def review_annotation(
     else:
         ann.review_comment = payload.comment
 
+    if payload.status == "rejected" and ann.created_by and ann.created_by != user.id:
+        from app.models.task import Task
+        from app.services.notifications import notify
+        task = await db.get(Task, ann.task_id)
+        await notify(
+            db,
+            user_id=ann.created_by,
+            kind="review_rejected",
+            title=f"Annotation rejected on '{task.name}'",
+            body=payload.comment or "Reviewer rejected this annotation.",
+            link=f"/tasks/{task.id}?annotation={ann.id}",
+            project_id=task.project_id,
+            resource_type="annotation",
+            resource_id=ann.id,
+        )
+
     await audit(db, user=user, action=f"annotation.review_{payload.status}",
                 resource_type="annotation", resource_id=ann_id,
                 meta={"from": old_status, "reason": payload.reason},
@@ -258,6 +274,19 @@ async def create_comment(
         body=payload.body,
     )
     db.add(c)
+    await db.flush()
+
+    from app.models.task import Task
+    from app.services.notifications import notify_task_assignees
+    task = await db.get(Task, ann.task_id)
+    await notify_task_assignees(
+        db, task=task, exclude_user_id=user.id,
+        kind="comment_added",
+        title=f"New comment on '{task.name}'",
+        body=payload.body,
+        link=f"/tasks/{task.id}?annotation={ann.id}",
+    )
+
     await db.commit()
     await db.refresh(c)
     return c

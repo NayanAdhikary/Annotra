@@ -664,14 +664,15 @@ async def assign_task(
     db.add(assignment)
     await db.flush()
 
-    from app.services.notification import notify
+    from app.services.notifications import notify
     await notify(
         db,
         user_id=payload.user_id,
         kind="task_assigned",
-        title=f"You've been assigned to {task.name}",
+        title=f"You've been assigned to '{task.name}'",
         body=f"Role: {payload.role}",
         link=f"/tasks/{task.id}",
+        project_id=task.project_id,
         resource_type="task",
         resource_id=task.id,
     )
@@ -1418,7 +1419,7 @@ async def bulk_assign(
             await db.delete(a)
 
     # Add new entries
-    from app.services.notification import notify
+    from app.services.notifications import notify
     for uid, role in desired:
         if (uid, role) not in current_set:
             db.add(TaskAssignment(
@@ -1430,9 +1431,10 @@ async def bulk_assign(
                 db,
                 user_id=uid,
                 kind="task_assigned",
-                title=f"You've been assigned to {task.name}",
+                title=f"You've been assigned to '{task.name}'",
                 body=f"Role: {role}",
                 link=f"/tasks/{task.id}",
+                project_id=task.project_id,
                 resource_type="task",
                 resource_id=task.id,
             )

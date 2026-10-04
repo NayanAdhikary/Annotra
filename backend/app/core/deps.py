@@ -69,3 +69,13 @@ def require_role(*allowed: UserRole):
         return user
 
     return _dep
+
+async def assert_task_editable(db: AsyncSession, task_id: int) -> None:
+    from app.models.task import Task
+    task = await db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(404, "Task not found")
+    if task.status == "completed":
+        raise HTTPException(423, "This task is completed and locked. Ask a manager to reopen it.")
+    if task.status == "archived":
+        raise HTTPException(423, "This task is archived.")

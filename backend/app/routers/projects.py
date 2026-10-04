@@ -445,7 +445,7 @@ async def task_transition(
         t.last_submitted_at = datetime.now(timezone.utc)
         t.last_submitted_by = user.id
 
-    from app.services.notification import notify_task_assignees
+    from app.services.notifications import notify_task_assignees
     # Notifications on status change
     if old_status != t.status:
         if t.status == "review":
@@ -519,14 +519,14 @@ async def create_comment(
     db.add(c)
     await db.flush()
 
-    from app.services.notification import notify_task_assignees
+    from app.services.notifications import notify_task_assignees
     link = f"/tasks/{task_id}"
     if payload.annotation_id:
         link += f"?annotation={payload.annotation_id}"
     
     await notify_task_assignees(
         db, task=t, exclude_user_id=user.id,
-        kind="new_comment",
+        kind="comment_added",
         title=f"New comment on '{t.name}'",
         body=payload.body,
         link=link,
