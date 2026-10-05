@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { authApi } from '../../api/auth';
+import { UserPreferencesModal } from '../Preferences/UserPreferencesModal';
 
 export const UserMenu: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showPrefs, setShowPrefs] = useState(false);
   const { user, refreshToken, clear } = useAuthStore();
   const navigate = useNavigate();
 
@@ -94,6 +96,17 @@ export const UserMenu: React.FC = () => {
               My stats
             </button>
             <button 
+              onClick={() => { setIsOpen(false); setShowPrefs(true); }}
+              style={{
+                width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.5rem 0.75rem',
+                fontSize: '0.875rem', color: '#374151', cursor: 'pointer', borderRadius: '4px'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              Workspace preferences
+            </button>
+            <button 
               onClick={handleSignOut}
               style={{
                 width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.5rem 0.75rem',
@@ -107,6 +120,8 @@ export const UserMenu: React.FC = () => {
           </div>
         </div>
       )}
+
+      {showPrefs && <UserPreferencesModal onClose={() => setShowPrefs(false)} />}
     </div>
   );
 };

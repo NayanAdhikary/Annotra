@@ -24,6 +24,8 @@ import { useHistoryStore } from '../../store/historyStore';
 import { AddAnnotationCommand } from '../../commands/AnnotationCommands';
 import { snapPoint } from '../../lib/snap';
 import { useToolConfig } from '../../store/toolConfigStore';
+import { ToolTip } from './ToolTip';
+import { useRecentLabels } from '../../store/recentLabelsStore';
 
 interface Props {
   taskId: number;
@@ -116,7 +118,6 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
     return snapPoint(pos.x, pos.y, {
       snapToGrid: config.snap_to_grid,
       snapToVertex: config.snap_to_vertex,
-      snapToEdge: config.snap_to_edge,
       gridSize: config.grid_size,
       annotations: useAnnotationStore.getState().annotations,
       currentId: useAnnotationStore.getState().primaryId,
@@ -248,6 +249,31 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
         return;
       }
       if (inInput) return;
+      if (/^[1-9]$/.test(e.key)) {
+        const idx = parseInt(e.key, 10) - 1;
+        const org = { id: 1 };
+        const recentIds = useRecentLabels.getState().recentFor(org.id);
+        const labels = useAnnotationStore.getState().labels;
+        const recent = recentIds.map((id) => labels.find((l) => l.id === id)).filter(Boolean) as any[];
+        const rest = labels.filter((l) => !recentIds.includes(l.id));
+        const ordered = [...recent, ...rest];
+        const label = ordered[idx];
+        if (label) {
+          e.preventDefault();
+          useAnnotationStore.getState().setActiveLabel(label.id);
+        }
+        return;
+      }
+      if (config) {
+        const key = e.key.toUpperCase();
+        for (const [tool, shortcut] of Object.entries(config.shortcuts)) {
+          if (shortcut.toUpperCase() === key) {
+            e.preventDefault();
+            setTool(tool as any);
+            return;
+          }
+        }
+      }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
         e.preventDefault();
         useAnnotationStore.getState().selectByPredicate((a) => a.frame === frame);
@@ -276,7 +302,7 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [drawing, commitShape, currentTool, setTool, selectOne, frame, zoomBy, zoomTo, fit]);
+  }, [drawing, commitShape, currentTool, setTool, selectOne, frame, zoomBy, zoomTo, fit, config]);
 
   const visible = annotations.filter((a) => a.frame === frame);
   const primaryId = useAnnotationStore((s) => s.primaryId);
@@ -293,15 +319,13 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
       style={{
         cursor: pan.cursor,
         backgroundImage: config?.snap_to_grid
-          ? `linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
-             linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px)`
+          ? `linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px),
+             linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)`
           : undefined,
         backgroundSize: config?.snap_to_grid
-          ? `${config.grid_size * s}px ${config.grid_size * s}px`
+          ? `${config.grid_size * live.scale}px ${config.grid_size * live.scale}px`
           : undefined,
-        backgroundPosition: config?.snap_to_grid
-          ? `${live.x}px ${live.y}px`
-          : undefined,
+        backgroundPosition: config?.snap_to_grid ? `${live.x}px ${live.y}px` : undefined,
       }}
     >
       {readOnly && (
@@ -417,6 +441,8 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
       <div className="absolute bottom-3 left-3 z-10 text-[11px] text-slate-500 bg-white/80 backdrop-blur-sm px-2 py-1 rounded border border-slate-200 pointer-events-none">
         Scroll = zoom · Left-drag = pan · Shift+drag = marquee select · Space+drag = pan · 0 = fit · 1 = 100% · Shift+F = zoom to selection
       </div>
+
+      <ToolTip />
     </div>
   );
 };

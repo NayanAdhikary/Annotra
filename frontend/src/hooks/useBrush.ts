@@ -5,12 +5,14 @@ import type { Annotation } from '../types/annotation';
 import { annotationsApi } from '../api/annotations';
 import { useHistoryStore } from '../store/historyStore';
 import { AddAnnotationCommand } from '../commands/AnnotationCommands';
+import { useToolConfig } from '../store/toolConfigStore';
 
 export type BrushMode = 'brush' | 'eraser';
 
 export function useBrush(imageW: number, imageH: number, labelId: number | null) {
   const [mode, setMode] = useState<BrushMode>('brush');
-  const brushSize = useAnnotationStore((s) => s.brushSize);
+  const config = useToolConfig((s) => s.config);
+  const [brushSize, setBrushSize] = useState(config?.brush_size_default ?? 30);
   const [painting, setPainting] = useState(false);
   const [version, setVersion] = useState(0);
 

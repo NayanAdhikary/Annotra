@@ -1,30 +1,23 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-interface RecentState {
-  byTask: Record<number, number[]>;   // taskId → ordered label ids, most recent first
-  record: (taskId: number, labelId: number) => void;
-  recentFor: (taskId: number) => number[];
-  clear: (taskId: number) => void;
+interface State {
+  byOrg: Record<number, number[]>;
+  record: (orgId: number, labelId: number) => void;
+  recentFor: (orgId: number) => number[];
 }
 
-export const useRecentLabels = create<RecentState>()(
+export const useRecentLabels = create<State>()(
   persist(
     (set, get) => ({
-      byTask: {},
-      record: (taskId, labelId) =>
+      byOrg: {},
+      record: (orgId, labelId) =>
         set((s) => {
-          const existing = s.byTask[taskId] ?? [];
-          const next = [labelId, ...existing.filter((x) => x !== labelId)].slice(0, 8);
-          return { byTask: { ...s.byTask, [taskId]: next } };
+          const existing = s.byOrg[orgId] ?? [];
+          const next = [labelId, ...existing.filter((x) => x !== labelId)].slice(0, 9);
+          return { byOrg: { ...s.byOrg, [orgId]: next } };
         }),
-      recentFor: (taskId) => get().byTask[taskId] ?? [],
-      clear: (taskId) =>
-        set((s) => {
-          const next = { ...s.byTask };
-          delete next[taskId];
-          return { byTask: next };
-        }),
+      recentFor: (orgId) => get().byOrg[orgId] ?? [],
     }),
     { name: 'annotra.recent_labels' },
   ),

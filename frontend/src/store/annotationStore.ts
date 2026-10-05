@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Annotation, Label, ToolType } from '../types/annotation';
+import { useRecentLabels } from './recentLabelsStore';
 
 interface State {
   taskId: number | null;
@@ -108,7 +109,10 @@ export const useAnnotationStore = create<State>((set, get) => ({
 
   setTool: (t) => set({ currentTool: t, selectedIds: [], primaryId: null }),
   setBrushSize: (size) => set({ brushSize: size }),
-  setActiveLabel: (id) => set({ activeLabelId: id }),
+  setActiveLabel: (id) => {
+    useRecentLabels.getState().record(1, id);
+    set({ activeLabelId: id });
+  },
   // ---------- Selection ----------
   selectOne: (id) =>
     set({ selectedIds: id ? [id] : [], primaryId: id }),

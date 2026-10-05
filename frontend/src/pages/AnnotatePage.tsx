@@ -91,12 +91,16 @@ export const AnnotatePage: React.FC = () => {
   
   const loadConfig = useToolConfig((s) => s.load);
   const config = useToolConfig((s) => s.config);
+  // Mock org for now since useOrgStore is not fully implemented
+  const org = { id: 1 };
+
   useEffect(() => {
-    toolConfigApi.effective(id).then((cfg) => {
+    if (!org) return;
+    toolConfigApi.effective(org.id).then((cfg) => {
       loadConfig(cfg);
       useAnnotationStore.getState().setBrushSize(cfg.brush_size_default);
     }).catch(console.error);
-  }, [id, loadConfig]);
+  }, [org.id, loadConfig]);
   
   const [rejectedCount, setRejectedCount] = useState(0);
 

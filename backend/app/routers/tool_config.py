@@ -1,222 +1,146 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from pydantic import BaseModel
+from typing import Optional, List, Dict
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.models.user import UserRole, User
-from app.models.task import Task, Project
-from app.models.tool_config import ToolConfig, UserPreferences
-from app.schemas.tool_config import (
-    ToolConfigUpdate, ToolConfigResponse,
-    UserPreferencesUpdate,
+from app.models.user import User
+from app.models.tool_config import UserPreferences
+from app.services.tool_config import (
+    resolve_config, row_to_dict, get_or_create_org_config, CONFIG_FIELDS,
 )
-from app.services.tool_config import resolve_config, _row_to_dict, _get_project_config
-from app.services.audit import audit
-from app.routers.projects import _assert_project_access
 
 router = APIRouter()
 
+VALID_TOOLS = {"rectangle", "polygon", "polyline", "points", "brush", "eraser"}
 
-# ---------------- Project-level config ----------------
+class ConfigUpdate(BaseModel):
+    enabled_tools: Optional[List[str]] = None
+    default_tool: Optional[str] = None
+    brush_size_default: Optional[int] = None
+    brush_size_min: Optional[int] = None
+    brush_size_max: Optional[int] = None
+    default_zoom_mode: Optional[str] = None
+    snap_to_grid: Optional[bool] = None
+    snap_to_vertex: Optional[bool] = None
+    grid_size: Optional[int] = None
+    auto_advance_on_complete: Optional[bool] = None
+    auto_select_new_shape: Optional[bool] = None
+    confirm_bulk_delete: Optional[bool] = None
+    show_coordinates: Optional[bool] = None
+    show_shape_count: Optional[bool] = None
+    shortcuts: Optional[Dict[str, str]] = None
 
-@router.get("/projects/{project_id}/tool-config", response_model=ToolConfigResponse)
-async def get_project_config(
-    project_id: int,
+@router.get("/orgs/{org_id}/tool-config")
+async def get_org_config(
+    org_id: int,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await _assert_project_access(db, project_id, user)
-    cfg = await _get_project_config(db, project_id)
+    if org_id != 1:
+        raise HTTPException(404, "Org not found")
+    cfg = await get_or_create_org_config(db, org_id)
     await db.commit()
-    return _row_to_dict(cfg)
+    return row_to_dict(cfg)
 
-
-@router.patch("/projects/{project_id}/tool-config", response_model=ToolConfigResponse)
-async def update_project_config(
-    project_id: int, payload: ToolConfigUpdate, request: Request,
+@router.patch("/orgs/{org_id}/tool-config")
+async def update_org_config(
+    org_id: int, payload: ConfigUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    project = await _assert_project_access(db, project_id, user)
-    if project.owner_id != user.id and user.role not in (UserRole.ADMIN.value, UserRole.MANAGER.value):
+    if org_id != 1:
+        raise HTTPException(404, "Org not found")
+    if user.role not in ("admin", "manager"):
         raise HTTPException(403, "Not allowed")
 
-    cfg = await _get_project_config(db, project_id)
+    cfg = await get_or_create_org_config(db, org_id)
     changes = payload.model_dump(exclude_unset=True)
+
+    if "enabled_tools" in changes:
+        bad = [t for t in changes["enabled_tools"] if t not in VALID_TOOLS]
+        if bad:
+            raise HTTPException(422, f"Unknown tools: {bad}")
+        if not changes["enabled_tools"]:
+            raise HTTPException(422, "At least one tool must be enabled")
+
     for k, v in changes.items():
         setattr(cfg, k, v)
 
     if cfg.default_tool not in cfg.enabled_tools:
-        cfg.default_tool = cfg.enabled_tools[0] if cfg.enabled_tools else "rectangle"
+        cfg.default_tool = cfg.enabled_tools[0]
 
-    await audit(db, user=user,
-                action="tool_config.update_project",
-                resource_type="project", resource_id=project_id,
-                meta={"fields": list(changes.keys())}, request=request)
     await db.commit()
     await db.refresh(cfg)
-    return _row_to_dict(cfg)
+    return row_to_dict(cfg)
 
-
-# ---------------- Task-level config ----------------
-
-@router.get("/tasks/{task_id}/tool-config", response_model=ToolConfigResponse)
-async def get_task_config(
-    task_id: int,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    task = await db.get(Task, task_id)
-    if task is None:
-        raise HTTPException(404)
-    await _assert_project_access(db, task.project_id, user)
-
-    resolved = await resolve_config(db, task.project_id, task_id=task_id)
-    return resolved
-
-
-@router.patch("/tasks/{task_id}/tool-config", response_model=ToolConfigResponse)
-async def update_task_config(
-    task_id: int, payload: ToolConfigUpdate, request: Request,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    task = await db.get(Task, task_id)
-    if task is None:
-        raise HTTPException(404)
-    project = await _assert_project_access(db, task.project_id, user)
-    if project.owner_id != user.id and user.role not in (UserRole.ADMIN.value, UserRole.MANAGER.value):
-        raise HTTPException(403, "Not allowed")
-
-    cfg = (await db.execute(
-        select(ToolConfig).where(ToolConfig.task_id == task_id)
-    )).scalar_one_or_none()
-
-    if cfg is None:
-        org = await _get_project_config(db, task.project_id)
-        cfg = ToolConfig(project_id=task.project_id, task_id=task_id, **_row_to_dict(org))
-        db.add(cfg)
-
-    changes = payload.model_dump(exclude_unset=True)
-    for k, v in changes.items():
-        setattr(cfg, k, v)
-
-    if cfg.default_tool not in cfg.enabled_tools:
-        cfg.default_tool = cfg.enabled_tools[0] if cfg.enabled_tools else "rectangle"
-
-    await audit(db, user=user,
-                action="tool_config.update_task",
-                resource_type="task", resource_id=task_id,
-                meta={"fields": list(changes.keys())}, request=request)
-    await db.commit()
-    await db.refresh(cfg)
-    return _row_to_dict(cfg)
-
-
-@router.delete("/tasks/{task_id}/tool-config", status_code=204)
-async def reset_task_config(
-    task_id: int, request: Request,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    task = await db.get(Task, task_id)
-    if task is None:
-        raise HTTPException(404)
-    project = await _assert_project_access(db, task.project_id, user)
-    if project.owner_id != user.id and user.role not in (UserRole.ADMIN.value, UserRole.MANAGER.value):
-        raise HTTPException(403, "Not allowed")
-
-    cfg = (await db.execute(
-        select(ToolConfig).where(ToolConfig.task_id == task_id)
-    )).scalar_one_or_none()
-    if cfg:
-        await db.delete(cfg)
-        await audit(db, user=user,
-                    action="tool_config.reset_task",
-                    resource_type="task", resource_id=task_id, request=request)
-        await db.commit()
-
-
-# ---------------- Effective config for the workspace ----------------
-
-@router.get("/tasks/{task_id}/effective-tool-config",
-            response_model=ToolConfigResponse)
+@router.get("/orgs/{org_id}/effective-config")
 async def effective_config(
-    task_id: int,
+    org_id: int,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    task = await db.get(Task, task_id)
-    if task is None:
-        raise HTTPException(404)
-    # Check access by fetching task using existing rules
-    from app.routers.projects import _assert_can_read_task
-    await _assert_can_read_task(db, task_id, user)
+    if org_id != 1:
+        raise HTTPException(404, "Org not found")
+    return await resolve_config(db, org_id, user_id=user.id)
 
-    return await resolve_config(
-        db, task.project_id, task_id=task_id, user_id=user.id,
-    )
-
-
-# ---------------- User preferences ----------------
-
-@router.get("/projects/{project_id}/me/preferences")
-async def get_my_prefs(
-    project_id: int,
+@router.get("/me/preferences")
+async def get_prefs(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await _assert_project_access(db, project_id, user)
+    org_id = 1
     prefs = (await db.execute(
         select(UserPreferences).where(
             UserPreferences.user_id == user.id,
-            UserPreferences.project_id == project_id,
+            UserPreferences.org_id == org_id,
         )
     )).scalar_one_or_none()
-    return {"overrides": (prefs.overrides if prefs else {}) or {}}
+    return {"overrides": prefs.overrides if prefs else {}}
 
-
-@router.put("/projects/{project_id}/me/preferences")
-async def update_my_prefs(
-    project_id: int,
-    payload: UserPreferencesUpdate,
+@router.put("/me/preferences")
+async def update_prefs(
+    payload: dict,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await _assert_project_access(db, project_id, user)
+    org_id = 1
+    overrides = payload.get("overrides", {})
+    bad = [k for k in overrides.keys() if k not in CONFIG_FIELDS]
+    if bad:
+        raise HTTPException(422, f"Unknown keys: {bad}")
+
     prefs = (await db.execute(
         select(UserPreferences).where(
             UserPreferences.user_id == user.id,
-            UserPreferences.project_id == project_id,
+            UserPreferences.org_id == org_id,
         )
     )).scalar_one_or_none()
 
     if prefs is None:
         prefs = UserPreferences(
-            user_id=user.id,
-            project_id=project_id,
-            overrides=payload.overrides,
+            user_id=user.id, org_id=org_id,
+            overrides=overrides,
         )
         db.add(prefs)
     else:
-        prefs.overrides = payload.overrides
+        prefs.overrides = overrides
 
     await db.commit()
-    return {"overrides": prefs.overrides}
+    return {"overrides": overrides}
 
-
-@router.delete("/projects/{project_id}/me/preferences", status_code=204)
-async def reset_my_prefs(
-    project_id: int,
+@router.delete("/me/preferences", status_code=204)
+async def reset_prefs(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await _assert_project_access(db, project_id, user)
+    org_id = 1
     prefs = (await db.execute(
         select(UserPreferences).where(
             UserPreferences.user_id == user.id,
-            UserPreferences.project_id == project_id,
+            UserPreferences.org_id == org_id,
         )
     )).scalar_one_or_none()
     if prefs:

@@ -12,6 +12,7 @@ from app.models.notification import Notification
 from app.models.annotation_comment import AnnotationComment
 from app.models.ml_model import MLModel, InferenceJob
 from app.models.tool_config import ToolConfig, UserPreferences
+from app.models.organization import Organization
 
 __all__ = [
     "MLModel",
@@ -32,5 +33,8 @@ __all__ = [
     "ExportJob",
     "ImportJob",
     "Notification",
-    "AnnotationComment"
+    "AnnotationComment",
+    "ToolConfig",
+    "UserPreferences",
+    "Organization"
 ]

@@ -1,31 +1,34 @@
 import { api } from './client';
-import type { ToolConfig } from '../store/toolConfigStore';
+
+export interface ToolConfig {
+  enabled_tools: string[];
+  default_tool: string;
+  brush_size_default: number;
+  brush_size_min: number;
+  brush_size_max: number;
+  default_zoom_mode: 'fit' | '100' | 'last';
+  snap_to_grid: boolean;
+  snap_to_vertex: boolean;
+  grid_size: number;
+  auto_advance_on_complete: boolean;
+  auto_select_new_shape: boolean;
+  confirm_bulk_delete: boolean;
+  show_coordinates: boolean;
+  show_shape_count: boolean;
+  shortcuts: Record<string, string>;
+}
 
 export const toolConfigApi = {
-  orgGet: async (orgId: number): Promise<ToolConfig> =>
+  getOrg: async (orgId: number): Promise<ToolConfig> =>
     (await api.get(`/api/orgs/${orgId}/tool-config`)).data,
-
-  orgUpdate: async (orgId: number, patch: Partial<ToolConfig>): Promise<ToolConfig> =>
+  updateOrg: async (orgId: number, patch: Partial<ToolConfig>): Promise<ToolConfig> =>
     (await api.patch(`/api/orgs/${orgId}/tool-config`, patch)).data,
-
-  taskGet: async (taskId: number): Promise<ToolConfig> =>
-    (await api.get(`/api/tasks/${taskId}/tool-config`)).data,
-
-  taskUpdate: async (taskId: number, patch: Partial<ToolConfig>): Promise<ToolConfig> =>
-    (await api.patch(`/api/tasks/${taskId}/tool-config`, patch)).data,
-
-  taskReset: async (taskId: number): Promise<void> =>
-    api.delete(`/api/tasks/${taskId}/tool-config`),
-
-  effective: async (taskId: number): Promise<ToolConfig> =>
-    (await api.get(`/api/tasks/${taskId}/effective-tool-config`)).data,
-
-  myPrefs: async (): Promise<{ overrides: Partial<ToolConfig> }> =>
+  effective: async (orgId: number): Promise<ToolConfig> =>
+    (await api.get(`/api/orgs/${orgId}/effective-config`)).data,
+  getPrefs: async (): Promise<{ overrides: Partial<ToolConfig> }> =>
     (await api.get('/api/me/preferences')).data,
-
-  saveMyPrefs: async (overrides: Partial<ToolConfig>) =>
+  savePrefs: async (overrides: Partial<ToolConfig>) =>
     (await api.put('/api/me/preferences', { overrides })).data,
-
-  resetMyPrefs: async (): Promise<void> =>
+  resetPrefs: async (): Promise<void> =>
     api.delete('/api/me/preferences'),
 };
