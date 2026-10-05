@@ -21,7 +21,7 @@ export const AdminHealthPage: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
-    adminApi.health().then(setH).finally(() => setLoading(false));
+    adminApi.health().then(setH).finally(() => setLoading(false)).catch(console.error);
   }, [tick]);
 
   // Auto-refresh every 15s

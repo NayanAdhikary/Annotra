@@ -38,7 +38,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [series, setSeries] = useState<{ date: string; annotations: number; active_users: number }[]>([]);
 
   useEffect(() => {
-    adminApi.analytics(30).then((s: any) => setSeries(s.points));
+    adminApi.analytics(30).then((s: any) => setSeries(s.points)).catch(console.error);
   }, []);
 
   useEffect(() => {

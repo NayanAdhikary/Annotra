@@ -8,7 +8,7 @@ export const UserPreferencesModal: React.FC<{ onClose: () => void }> = ({ onClos
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    toolConfigApi.getPrefs().then((p) => setOverrides(p.overrides));
+    toolConfigApi.getPrefs().then((p) => setOverrides(p.overrides)).catch(console.error);
   }, []);
 
   if (!current) return null;

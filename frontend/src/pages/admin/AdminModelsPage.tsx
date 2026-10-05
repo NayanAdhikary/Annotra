@@ -20,7 +20,7 @@ export const AdminModelsPage: React.FC = () => {
   const [err, setErr] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const refresh = () => mlApi.listModels().then(setModels).finally(() => setLoading(false));
+  const refresh = () => mlApi.listModels().then(setModels).finally(() => setLoading(false)).catch(console.error);
   useEffect(() => { refresh(); }, []);
 
   const upload = async () => {

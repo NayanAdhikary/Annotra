@@ -4,7 +4,7 @@ import type { InferenceJob } from '../../api/ml';
 
 export const InferenceHistory: React.FC<{ taskId: number }> = ({ taskId }) => {
   const [jobs, setJobs] = useState<InferenceJob[]>([]);
-  useEffect(() => { mlApi.listJobs(taskId).then(setJobs); }, [taskId]);
+  useEffect(() => { mlApi.listJobs(taskId).then(setJobs); }, [taskId]).catch(console.error);
 
   if (jobs.length === 0) return null;
 

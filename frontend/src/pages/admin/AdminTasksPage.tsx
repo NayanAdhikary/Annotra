@@ -27,7 +27,7 @@ const AssignModal: React.FC<{
   const [assignees, setAssignees] = useState(task.assignees);
 
   useEffect(() => {
-    adminApi.listUsers({ limit: 500 }).then(setUsers);
+    adminApi.listUsers({ limit: 500 }).then(setUsers).catch(console.error);
   }, []);
 
   // If the parent refreshes and hands us a new task object, sync.

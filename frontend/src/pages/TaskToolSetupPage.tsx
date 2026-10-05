@@ -67,8 +67,8 @@ export const TaskToolSetupPage: React.FC = () => {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    taskApi.get(id).then(setTask);
-    toolConfigApi.taskGet(id).then(setCfg);
+    taskApi.get(id).then(setTask).catch(console.error);
+    toolConfigApi.taskGet(id).then(setCfg).catch(console.error);
   }, [id]);
 
   if (!cfg || !task) return <div className="p-8 text-slate-500">Loading…</div>;

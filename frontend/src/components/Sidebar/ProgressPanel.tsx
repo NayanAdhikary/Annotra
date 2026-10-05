@@ -10,7 +10,7 @@ export const ProgressPanel: React.FC<Props> = ({ taskId, refreshKey }) => {
   const [p, setP] = useState<TaskProgress | null>(null);
 
   useEffect(() => {
-    annotatorApi.progress(taskId).then(setP);
+    annotatorApi.progress(taskId).then(setP).catch(console.error);
   }, [taskId, refreshKey]);
 
   if (!p) return null;

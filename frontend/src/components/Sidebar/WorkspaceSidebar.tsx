@@ -21,7 +21,7 @@ export const WorkspaceSidebar: React.FC<{ taskId: number; initialTab?: Tab }> = 
   const openCount = comments.filter((c) => !c.resolved).length;
   const isAdmin = useIsAdminOrManager();
 
-  const refresh = () => tasksApi.listComments(taskId).then(setComments);
+  const refresh = () => tasksApi.listComments(taskId).then(setComments).catch(console.error);
   useEffect(() => { refresh(); }, [taskId]);
 
   const annCount = useAnnotationStore((s) => s.annotations.length);

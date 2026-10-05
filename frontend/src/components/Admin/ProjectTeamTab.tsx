@@ -28,7 +28,7 @@ export const ProjectTeamTab: React.FC<Props> = ({ tasks, onChanged }) => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api.get('/api/admin/users', { params: { limit: 500 } }).then((r) => setUsers(r.data));
+    api.get('/api/admin/users', { params: { limit: 500 } }).then((r) => setUsers(r.data)).catch(console.error);
   }, []);
 
   const eligible = users.filter(

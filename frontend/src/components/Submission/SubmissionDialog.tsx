@@ -17,7 +17,7 @@ export const SubmissionDialog: React.FC<Props> = ({
   const [needsForce, setNeedsForce] = useState(false);
 
   useEffect(() => {
-    annotatorApi.preflight(taskId).then(setPreflight);
+    annotatorApi.preflight(taskId).then(setPreflight).catch(console.error);
   }, [taskId]);
 
   if (!preflight) return null;

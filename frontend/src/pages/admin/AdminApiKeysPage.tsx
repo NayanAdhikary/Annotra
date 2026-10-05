@@ -9,7 +9,7 @@ export const AdminApiKeysPage: React.FC = () => {
   const [expiresDays, setExpiresDays] = useState<number | ''>('');
   const [rawKey, setRawKey] = useState<string | null>(null);
 
-  const refresh = () => adminApi.listApiKeys().then(setKeys).finally(() => setLoading(false));
+  const refresh = () => adminApi.listApiKeys().then(setKeys).finally(() => setLoading(false)).catch(console.error);
   useEffect(() => { refresh(); }, []);
 
   const create = async () => {

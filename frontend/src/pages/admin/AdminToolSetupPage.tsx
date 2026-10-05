@@ -37,7 +37,7 @@ export const AdminToolSetupPage: React.FC = () => {
 
   useEffect(() => {
     if (!org) return;
-    toolConfigApi.getOrg(org.id).then(setCfg);
+    toolConfigApi.getOrg(org.id).then(setCfg).catch(console.error);
   }, [org]);
 
   if (!cfg || !org) return <div className="p-8 text-slate-500">Loading…</div>;

@@ -9,7 +9,7 @@ export const AdminNotificationsPage: React.FC = () => {
   const [hours, setHours] = useState(24);
   const [busy, setBusy] = useState(false);
 
-  const refresh = () => adminApi.listNotifications().then(setItems);
+  const refresh = () => adminApi.listNotifications().then(setItems).catch(console.error);
   useEffect(() => { refresh(); }, []);
 
   const publish = async () => {

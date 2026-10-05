@@ -13,7 +13,7 @@ interface MyStats {
 export const MyStatsPage: React.FC = () => {
   const [s, setS] = useState<MyStats | null>(null);
   useEffect(() => {
-    api.get('/api/me/stats').then((r) => setS(r.data));
+    api.get('/api/me/stats').then((r) => setS(r.data)).catch(console.error);
   }, []);
 
   if (!s) return <div className="p-8 text-slate-500">Loading…</div>;

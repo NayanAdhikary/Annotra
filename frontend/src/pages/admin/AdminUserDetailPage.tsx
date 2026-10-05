@@ -22,7 +22,7 @@ export const AdminUserDetailPage: React.FC = () => {
 
   const [sessions, setSessions] = useState<any[]>([]);
   useEffect(() => {
-    adminApi.listUserSessions(id).then(setSessions);
+    adminApi.listUserSessions(id).then(setSessions).catch(console.error);
   }, [id, busy]);
 
   if (loading) return <div className="p-8 text-slate-500">Loading…</div>;

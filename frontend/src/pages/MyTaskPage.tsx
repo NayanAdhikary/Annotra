@@ -151,7 +151,7 @@ export const MyTasksPage: React.FC = () => {
     tasksApi.myTasks({
       status: (statusFilter || undefined) as TaskStatus | undefined,
       role: (roleFilter || undefined) as any,
-    }).then(setRows).finally(() => setLoading(false));
+    }).then(setRows).finally(() => setLoading(false)).catch(console.error);
   }, [statusFilter, roleFilter]);
 
   const annotatorRows = rows.filter((r) => r.role === 'annotator');

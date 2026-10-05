@@ -80,7 +80,7 @@ export const TaskSetupPage: React.FC = () => {
         const needsPolling = videos.some(v => ['pending', 'running'].includes(v.extraction_status));
         if (!needsPolling) return;
         const timer = setInterval(() => {
-            api.get(`/api/tasks/${id}/videos`).then(res => setVideos(res.data));
+            api.get(`/api/tasks/${id}/videos`).then(res => setVideos(res.data)).catch(console.error);
         }, 2000);
         return () => clearInterval(timer);
     }, [task, videos, id]);
@@ -261,7 +261,7 @@ export const TaskSetupPage: React.FC = () => {
                 onClose={() => setShowImport(false)}
                 onDone={() => {
                   // Refresh image list
-                  imagesApi.list(id).then(setImages);
+                  imagesApi.list(id).then(setImages).catch(console.error);
                 }}
               />
             )}

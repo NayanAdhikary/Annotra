@@ -88,7 +88,7 @@ export const AdminUsersPage: React.FC = () => {
     adminApi.listUsers({
       q: q || undefined,
       role: (roleFilter || undefined) as Role | undefined,
-    }).then(setUsers).finally(() => setLoading(false));
+    }).then(setUsers).finally(() => setLoading(false)).catch(console.error);
   };
 
   useEffect(() => { refresh(); }, [q, roleFilter]);

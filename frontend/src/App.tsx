@@ -7,33 +7,33 @@ import { authApi } from './api/auth';
 import { AdminLayout } from './components/Admin/AdminLayout';
 
 
-const LoginPage = React.lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
-const RegisterPage = React.lazy(() => import('./pages/RegisterPage').then(m => ({ default: m.RegisterPage })));
-const ProjectsPage = React.lazy(() => import('./pages/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
-const ProjectDetailPage = React.lazy(() => import('./pages/ProjectDetailPage').then(m => ({ default: m.ProjectDetailPage })));
-const ProjectSettingsPage = React.lazy(() => import('./pages/ProjectSettingsPage').then(m => ({ default: m.ProjectSettingsPage })));
-const TaskSetupPage = React.lazy(() => import('./pages/TaskSetupPage').then(m => ({ default: m.TaskSetupPage })));
-const TaskToolSetupPage = React.lazy(() => import('./pages/TaskToolSetupPage').then(m => ({ default: m.TaskToolSetupPage })));
-const AnnotatePage = React.lazy(() => import('./pages/AnnotatePage').then(m => ({ default: m.AnnotatePage })));
-const VideoAnnotatePage = React.lazy(() => import('./pages/VideoAnnotatePage').then(m => ({ default: m.VideoAnnotatePage })));
-const MyTasksPage = React.lazy(() => import('./pages/MyTaskPage').then(m => ({ default: m.MyTasksPage })));
-const MyStatsPage = React.lazy(() => import('./pages/MyStatsPage').then(m => ({ default: m.MyStatsPage })));
-const TaskDetailPage = React.lazy(() => import('./pages/TaskDetailPage').then(m => ({ default: m.TaskDetailPage })));
+const LoginPage = React.lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage }))).catch(console.error);
+const RegisterPage = React.lazy(() => import('./pages/RegisterPage').then(m => ({ default: m.RegisterPage }))).catch(console.error);
+const ProjectsPage = React.lazy(() => import('./pages/ProjectsPage').then(m => ({ default: m.ProjectsPage }))).catch(console.error);
+const ProjectDetailPage = React.lazy(() => import('./pages/ProjectDetailPage').then(m => ({ default: m.ProjectDetailPage }))).catch(console.error);
+const ProjectSettingsPage = React.lazy(() => import('./pages/ProjectSettingsPage').then(m => ({ default: m.ProjectSettingsPage }))).catch(console.error);
+const TaskSetupPage = React.lazy(() => import('./pages/TaskSetupPage').then(m => ({ default: m.TaskSetupPage }))).catch(console.error);
+const TaskToolSetupPage = React.lazy(() => import('./pages/TaskToolSetupPage').then(m => ({ default: m.TaskToolSetupPage }))).catch(console.error);
+const AnnotatePage = React.lazy(() => import('./pages/AnnotatePage').then(m => ({ default: m.AnnotatePage }))).catch(console.error);
+const VideoAnnotatePage = React.lazy(() => import('./pages/VideoAnnotatePage').then(m => ({ default: m.VideoAnnotatePage }))).catch(console.error);
+const MyTasksPage = React.lazy(() => import('./pages/MyTaskPage').then(m => ({ default: m.MyTasksPage }))).catch(console.error);
+const MyStatsPage = React.lazy(() => import('./pages/MyStatsPage').then(m => ({ default: m.MyStatsPage }))).catch(console.error);
+const TaskDetailPage = React.lazy(() => import('./pages/TaskDetailPage').then(m => ({ default: m.TaskDetailPage }))).catch(console.error);
 
-const AdminQualityPage = React.lazy(() => import('./pages/admin/AdminQualityPage').then(m => ({ default: m.AdminQualityPage })));
-const AdminDashboardPage = React.lazy(() => import('./pages/admin/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
-const AdminUsersPage = React.lazy(() => import('./pages/admin/AdminUsersPage').then(m => ({ default: m.AdminUsersPage })));
-const AdminUserDetailPage = React.lazy(() => import('./pages/admin/AdminUserDetailPage').then(m => ({ default: m.AdminUserDetailPage })));
-const AdminAuditPage = React.lazy(() => import('./pages/admin/AdminAuditPage').then(m => ({ default: m.AdminAuditPage })));
-const AdminHealthPage = React.lazy(() => import('./pages/admin/AdminHealthPage').then(m => ({ default: m.AdminHealthPage })));
-const AdminProjectsPage = React.lazy(() => import('./pages/admin/AdminProjectsPage').then(m => ({ default: m.AdminProjectsPage })));
-const AdminTasksPage = React.lazy(() => import('./pages/admin/AdminTasksPage').then(m => ({ default: m.AdminTasksPage })));
-const AdminApiKeysPage = React.lazy(() => import('./pages/admin/AdminApiKeysPage').then(m => ({ default: m.AdminApiKeysPage })));
-const AdminSettingsPage = React.lazy(() => import('./pages/AdminSettingsPage').then(m => ({ default: m.AdminSettingsPage })));
-const AdminNotificationsPage = React.lazy(() => import('./pages/admin/AdminNotificationsPage').then(m => ({ default: m.AdminNotificationsPage })));
-const AdminProjectDetailPage = React.lazy(() => import('./pages/admin/AdminProjectDetailPage').then(m => ({ default: m.AdminProjectDetailPage })));
-const AdminModelsPage = React.lazy(() => import('./pages/admin/AdminModelsPage').then(m => ({ default: m.AdminModelsPage })));
-const AdminToolSetupPage = React.lazy(() => import('./pages/admin/AdminToolSetupPage').then(m => ({ default: m.AdminToolSetupPage })));
+const AdminQualityPage = React.lazy(() => import('./pages/admin/AdminQualityPage').then(m => ({ default: m.AdminQualityPage }))).catch(console.error);
+const AdminDashboardPage = React.lazy(() => import('./pages/admin/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage }))).catch(console.error);
+const AdminUsersPage = React.lazy(() => import('./pages/admin/AdminUsersPage').then(m => ({ default: m.AdminUsersPage }))).catch(console.error);
+const AdminUserDetailPage = React.lazy(() => import('./pages/admin/AdminUserDetailPage').then(m => ({ default: m.AdminUserDetailPage }))).catch(console.error);
+const AdminAuditPage = React.lazy(() => import('./pages/admin/AdminAuditPage').then(m => ({ default: m.AdminAuditPage }))).catch(console.error);
+const AdminHealthPage = React.lazy(() => import('./pages/admin/AdminHealthPage').then(m => ({ default: m.AdminHealthPage }))).catch(console.error);
+const AdminProjectsPage = React.lazy(() => import('./pages/admin/AdminProjectsPage').then(m => ({ default: m.AdminProjectsPage }))).catch(console.error);
+const AdminTasksPage = React.lazy(() => import('./pages/admin/AdminTasksPage').then(m => ({ default: m.AdminTasksPage }))).catch(console.error);
+const AdminApiKeysPage = React.lazy(() => import('./pages/admin/AdminApiKeysPage').then(m => ({ default: m.AdminApiKeysPage }))).catch(console.error);
+const AdminSettingsPage = React.lazy(() => import('./pages/AdminSettingsPage').then(m => ({ default: m.AdminSettingsPage }))).catch(console.error);
+const AdminNotificationsPage = React.lazy(() => import('./pages/admin/AdminNotificationsPage').then(m => ({ default: m.AdminNotificationsPage }))).catch(console.error);
+const AdminProjectDetailPage = React.lazy(() => import('./pages/admin/AdminProjectDetailPage').then(m => ({ default: m.AdminProjectDetailPage }))).catch(console.error);
+const AdminModelsPage = React.lazy(() => import('./pages/admin/AdminModelsPage').then(m => ({ default: m.AdminModelsPage }))).catch(console.error);
+const AdminToolSetupPage = React.lazy(() => import('./pages/admin/AdminToolSetupPage').then(m => ({ default: m.AdminToolSetupPage }))).catch(console.error);
 
 const SuspenseWrapper = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<div className="p-8 text-slate-500">Loading...</div>}>

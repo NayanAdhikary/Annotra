@@ -27,7 +27,7 @@ export const ExportDrawer: React.FC<{ taskId: number; taskType: string; onClose:
   const [busy, setBusy] = useState(false);
   const [jobs, setJobs] = useState<ExportJob[]>([]);
 
-  const refresh = () => exportsApi.listExports(taskId).then(setJobs);
+  const refresh = () => exportsApi.listExports(taskId).then(setJobs).catch(console.error);
   useEffect(() => { refresh(); }, [taskId]);
 
   useEffect(() => {

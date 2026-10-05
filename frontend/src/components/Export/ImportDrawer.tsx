@@ -46,7 +46,7 @@ export const ImportDrawer: React.FC<{ taskId: number; onClose: () => void; onDon
       return;
     }
     const timer = setInterval(() => {
-      exportsApi.getImport(job.id).then(setJob);
+      exportsApi.getImport(job.id).then(setJob).catch(console.error);
     }, 2000);
     return () => clearInterval(timer);
   }, [job, onDone]);

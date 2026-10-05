@@ -19,7 +19,7 @@ export const ImageStrip: React.FC<Props> = ({ taskId, currentIndex, onJump, refr
   const [statuses, setStatuses] = useState<ImageStatus[]>([]);
 
   useEffect(() => {
-    annotatorApi.imageStatuses(taskId).then(setStatuses);
+    annotatorApi.imageStatuses(taskId).then(setStatuses).catch(console.error);
   }, [taskId, refreshKey]);
 
   if (!statuses.length) return null;

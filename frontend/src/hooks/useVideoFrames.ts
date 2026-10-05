@@ -7,7 +7,7 @@ export const useVideoFrames = (taskId: number) => {
   useEffect(() => {
     fetch(`/api/tasks/${taskId}/frames`)
       .then((r) => r.json())
-      .then((data) => setFrames(data.frames));
+      .then((data) => setFrames(data.frames)).catch(console.error);
   }, [taskId]);
 
   return { frames, currentFrame, setCurrentFrame };
