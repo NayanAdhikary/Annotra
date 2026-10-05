@@ -60,9 +60,17 @@ app = FastAPI(title="Annotra API", version="0.1.0", lifespan=lifespan)
 
 from fastapi.responses import JSONResponse
 import traceback
+import logging
+logger = logging.getLogger(__name__)
+
 @app.exception_handler(Exception)
-async def debug_exception_handler(request, exc):
-    return JSONResponse(status_code=500, content={"detail": str(exc), "traceback": traceback.format_exc()})
+async def global_exception_handler(request, exc):
+    error_id = str(int(time.time()))
+    logger.error(f"Unhandled Exception [ID: {error_id}]: {exc}\n{traceback.format_exc()}")
+    return JSONResponse(
+        status_code=500, 
+        content={"detail": "Something went wrong. Please try again later.", "error_id": error_id}
+    )
 
 # Timing header (visible in browser DevTools Network tab)
 class TimingMiddleware(BaseHTTPMiddleware):
