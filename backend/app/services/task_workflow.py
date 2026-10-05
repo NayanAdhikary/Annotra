@@ -47,10 +47,23 @@ async def transition_task(
         )
 
     required = TRANSITION_ROLES.get((current, to_status), set())
-    if user.role not in required:
+    
+    # Get all roles the user has (global + assigned to this task)
+    user_roles = {user.role}
+    from app.models.task_assignment import TaskAssignment
+    from sqlalchemy import select
+    assignments = (await db.execute(
+        select(TaskAssignment.role).where(
+            TaskAssignment.task_id == task.id,
+            TaskAssignment.user_id == user.id,
+        )
+    )).scalars().all()
+    user_roles.update(assignments)
+    
+    if not user_roles.intersection(required):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            f"Role '{user.role}' cannot move from '{current}' to '{to_status}'",
+            f"Roles {user_roles} cannot move from '{current}' to '{to_status}'",
         )
 
     task.status = to_status
