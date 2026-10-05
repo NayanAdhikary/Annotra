@@ -64,7 +64,7 @@ export const PredictDialog: React.FC<Props> = ({ taskId, onClose, onDone }) => {
         }
       }, 1500);
     } catch (e: any) {
-      setErr(e?.response?.data?.detail ?? 'Failed to start');
+      setErr(e.userMessage ?? 'Failed to start');
       setBusy(false);
     }
   };

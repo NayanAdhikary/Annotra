@@ -42,7 +42,7 @@ const CreateTaskModal: React.FC<{
       await adminApi.createTask(projectId, { name, task_type: taskType });
       onCreated();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to create task');
+      setError(err.userMessage || 'Failed to create task');
     } finally {
       setBusy(false);
     }

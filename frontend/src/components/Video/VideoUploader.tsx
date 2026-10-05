@@ -25,7 +25,7 @@ export const VideoUploader: React.FC<Props> = ({ taskId, onUploadComplete }) => 
       });
       onUploadComplete();
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message);
+      setError(err.userMessage || err.message);
     } finally {
       setUploading(false);
       // clear the input

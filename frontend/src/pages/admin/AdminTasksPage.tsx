@@ -72,7 +72,7 @@ const AssignModal: React.FC<{
       await reloadTask();
       onChanged();
     } catch (e: any) {
-      const detail = e?.response?.data?.detail;
+      const detail = e.userMessage;
       setError(typeof detail === 'string' ? detail : 'Assign failed');
     } finally {
       setBusy(false);
@@ -90,7 +90,7 @@ const AssignModal: React.FC<{
       await reloadTask();
       onChanged();
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? 'Remove failed');
+      setError(e.userMessage ?? 'Remove failed');
     } finally {
       setBusy(false);
     }

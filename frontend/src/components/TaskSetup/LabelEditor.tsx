@@ -26,7 +26,7 @@ export const LabelEditor: React.FC<Props> = ({ taskId }) => {
   const wrap = useSaveStatus();
 
   const formatError = (e: any) => {
-    const detail = e?.response?.data?.detail;
+    const detail = e.userMessage;
     if (Array.isArray(detail)) {
       return detail.map((d: any) => `${d.loc.join('.')}: ${d.msg}`).join('\n');
     }

@@ -31,7 +31,7 @@ const CreateUserModal: React.FC<{ onClose: () => void; onCreated: () => void }> 
       await adminApi.createUser(form);
       onCreated();
     } catch (e: any) {
-      const d = e?.response?.data?.detail;
+      const d = e.userMessage;
       setErr(typeof d === 'string' ? d : Array.isArray(d) ? d[0].msg : 'Failed');
     } finally {
       setBusy(false);

@@ -28,7 +28,7 @@ export const SubmissionDialog: React.FC<Props> = ({
       await annotatorApi.submit(taskId, force, note.trim() || undefined);
       onSubmitted();
     } catch (e: any) {
-      const detail = e?.response?.data?.detail;
+      const detail = e.userMessage;
       if (detail?.preflight) {
         setPreflight(detail.preflight);
         setNeedsForce(true);

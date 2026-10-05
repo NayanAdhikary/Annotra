@@ -66,7 +66,7 @@ export const ProjectSetupTab: React.FC<Props> = ({ projectId, tasks, onChanged }
         done++;
         setProgress({ done, total: targetTasks.length });
       }
-      alert(`Successfully synced labels to ${done} tasks!`);
+      toast.push('success', `Successfully synced labels to ${done} tasks!`);
       onChanged();
     } catch (e: any) {
       toast.push('error', e.userMessage ?? 'Something went wrong');

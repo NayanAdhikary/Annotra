@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { adminApi } from '../../api/admin';
+import { useToast } from "../../components/Toast/ToastProvider";
 
 export const AdminApiKeysPage: React.FC = () => {
+  const toast = useToast();
   const [keys, setKeys] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -33,7 +35,7 @@ export const AdminApiKeysPage: React.FC = () => {
   };
 
   const copy = () => {
-    if (rawKey) { navigator.clipboard.writeText(rawKey); alert('Copied'); }
+    if (rawKey) { navigator.clipboard.writeText(rawKey); toast.push('info', 'Copied'); }
   };
 
   if (loading) return <div className="p-8 text-slate-500">Loading…</div>;

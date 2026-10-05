@@ -34,7 +34,7 @@ export const ImportDrawer: React.FC<{ taskId: number; onClose: () => void; onDon
       });
       setMapping(newMap);
     }).catch(err => {
-      alert('Failed to detect format: ' + err.message);
+      toast.push('error', 'Failed to detect format: ' + err.message);
       setFile(null);
     }).finally(() => {
       setDetecting(false);

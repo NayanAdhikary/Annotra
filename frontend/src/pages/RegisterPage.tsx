@@ -34,7 +34,7 @@ export const RegisterPage: React.FC = () => {
       setSession(user, access_token, refresh_token);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to register. Please try again.');
+      setError(err.userMessage || 'Failed to register. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -56,7 +56,7 @@ export const ExportDrawer: React.FC<{ taskId: number; taskType: string; onClose:
     const res = await fetch(exportsApi.downloadUrl(jobId), {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) { alert('Download failed'); return; }
+    if (!res.ok) { toast.push('error', 'Download failed'); return; }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

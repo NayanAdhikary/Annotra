@@ -34,7 +34,7 @@ export const AdminModelsPage: React.FC = () => {
       setName(''); setDescription(''); setVersion('1.0'); setFile(null);
       await refresh();
     } catch (e: any) {
-      setErr(e?.response?.data?.detail ?? 'Upload failed');
+      setErr(e.userMessage ?? 'Upload failed');
     } finally { setUploading(false); }
   };
 

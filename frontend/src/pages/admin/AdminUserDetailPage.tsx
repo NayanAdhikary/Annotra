@@ -49,7 +49,7 @@ export const AdminUserDetailPage: React.FC = () => {
     const pw = window.prompt('New password (min 8, letter + digit):');
     if (!pw) return;
     setBusy(true);
-    try { await adminApi.resetPassword(id, pw); alert('Password reset. All their sessions were revoked.'); refresh(); }
+    try { await adminApi.resetPassword(id, pw); toast.push('info', 'Password reset. All their sessions were revoked.'); refresh(); }
     catch (e: any) { toast.push('error', e.userMessage ?? 'Something went wrong'); }
     finally { setBusy(false); }
   };
