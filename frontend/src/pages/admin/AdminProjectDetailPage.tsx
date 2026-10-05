@@ -5,6 +5,7 @@ import { adminApi } from '../../api/admin';
 import { ProjectDataTab } from '../../components/Admin/ProjectDataTab';
 import { ProjectTeamTab } from '../../components/Admin/ProjectTeamTab';
 import { ProjectSetupTab } from '../../components/Admin/ProjectSetupTab';
+import { useToast } from "../../components/Toast/ToastProvider";
 
 export interface AdminProject {
   id: number; name: string; description: string | null;
@@ -95,6 +96,7 @@ const CreateTaskModal: React.FC<{
 };
 
 export const AdminProjectDetailPage: React.FC = () => {
+    const toast = useToast();
   const { projectId } = useParams<{ projectId: string }>();
   const id = Number(projectId);
   const navigate = useNavigate();
@@ -177,7 +179,7 @@ export const AdminProjectDetailPage: React.FC = () => {
                   await api.delete(`/api/projects/${id}`);
                   navigate('/admin/projects');
                 } catch (e: any) {
-                  alert(e?.response?.data?.detail ?? 'Failed to delete project');
+                  toast.push('error', e.userMessage ?? 'Something went wrong');
                 }
               }}
               className="px-4 py-2 border border-red-300 text-red-600 text-sm font-medium rounded-md hover:bg-red-50 shadow-sm"

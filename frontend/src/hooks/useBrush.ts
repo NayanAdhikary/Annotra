@@ -6,6 +6,7 @@ import { annotationsApi } from '../api/annotations';
 import { useHistoryStore } from '../store/historyStore';
 import { AddAnnotationCommand } from '../commands/AnnotationCommands';
 import { useToolConfig } from '../store/toolConfigStore';
+import { useToast } from "./components/Toast/ToastProvider";
 
 export type BrushMode = 'brush' | 'eraser';
 
@@ -53,6 +54,7 @@ export function useBrush(imageW: number, imageH: number, labelId: number | null)
   }, [painting, paintAt]);
 
   const endPaint = useCallback(async () => {
+      const toast = useToast();
     if (!painting) return;
     setPainting(false);
     if (!dirtyRef.current || !maskRef.current || labelId === null) return;
@@ -83,7 +85,7 @@ export function useBrush(imageW: number, imageH: number, labelId: number | null)
         });
         useAnnotationStore.getState().attachServerId(ann.id, server.id);
       } catch (e) {
-        console.error('mask persist failed', e);
+        toast.push('error', e.userMessage ?? 'Something went wrong');
         // Rollback on server failure to keep state synced
         useHistoryStore.getState().undo();
         useHistoryStore.setState({ future: [] });

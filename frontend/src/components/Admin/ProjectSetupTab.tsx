@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import type { AdminTask } from '../../pages/admin/AdminProjectDetailPage';
 import { LabelEditor } from '../TaskSetup/LabelEditor';
 import { useAnnotationStore } from '../../store/annotationStore';
+import { useToast } from "../Toast/ToastProvider";
 
 interface Props {
   projectId: number;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export const ProjectSetupTab: React.FC<Props> = ({ projectId, tasks, onChanged }) => {
+    const toast = useToast();
   const [sourceTaskId, setSourceTaskId] = useState<number | ''>('');
   const [syncing, setSyncing] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -67,8 +69,8 @@ export const ProjectSetupTab: React.FC<Props> = ({ projectId, tasks, onChanged }
       alert(`Successfully synced labels to ${done} tasks!`);
       onChanged();
     } catch (e: any) {
-      console.error(e);
-      alert('Failed to sync some labels. ' + (e?.response?.data?.detail || e.message));
+      toast.push('error', e.userMessage ?? 'Something went wrong');
+      toast.push('error', e.userMessage ?? 'Something went wrong');
     } finally {
       setSyncing(false);
     }

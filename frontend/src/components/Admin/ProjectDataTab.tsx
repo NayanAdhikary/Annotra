@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { api } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 import type { AdminTask } from '../../pages/admin/AdminProjectDetailPage';
+import { useToast } from "../Toast/ToastProvider";
 
 interface Props {
   projectId: number;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export const ProjectDataTab: React.FC<Props> = ({ projectId, tasks, onChanged }) => {
+    const toast = useToast();
   const [selectedTaskId, setSelectedTaskId] = useState<number | ''>('');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -60,8 +62,8 @@ export const ProjectDataTab: React.FC<Props> = ({ projectId, tasks, onChanged })
         setProgress({ done: doneCount, total: fileArray.length });
       }
     } catch (e) {
-      console.error(e);
-      alert('Upload failed or partially completed.');
+      toast.push('error', e.userMessage ?? 'Something went wrong');
+      toast.push('error', e.userMessage ?? 'Something went wrong');
     } finally {
       setUploading(false);
       setSkipped(newSkipped);

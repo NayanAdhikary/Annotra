@@ -18,8 +18,10 @@ import { ImportDrawer } from '../components/Export/ImportDrawer';
 import { PredictDialog } from '../components/ML/PredictDialog';
 import { InferenceHistory } from '../components/ML/InferenceHistory';
 import { useAuthStore } from '../store/authStore';
+import { useToast } from "../components/Toast/ToastProvider";
 
 export const TaskSetupPage: React.FC = () => {
+    const toast = useToast();
     const { taskId } = useParams<{ taskId: string }>();
     const id = parseInt(taskId || '0', 10);
     const navigate = useNavigate();
@@ -61,7 +63,7 @@ export const TaskSetupPage: React.FC = () => {
                 setImages(imgs);
             }
         } catch (e: any) {
-            console.error(e);
+            toast.push('error', e.userMessage ?? 'Something went wrong');
             setError(e.message || 'Failed to load task');
         } finally {
             setIsLoading(false);
@@ -96,8 +98,8 @@ export const TaskSetupPage: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['projects'] });
             navigate(`/projects/${task?.project_id}`);
         } catch (e) {
-            console.error(e);
-            alert("Failed to delete task.");
+            toast.push('error', e.userMessage ?? 'Something went wrong');
+            toast.push('error', e.userMessage ?? 'Something went wrong');
         }
     };
 

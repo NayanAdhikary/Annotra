@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { exportsApi, type DetectResult, type ImportJob } from '../../api/exports';
 import { useAnnotationStore } from '../../store/annotationStore';
+import { useToast } from "../Toast/ToastProvider";
 
 export const ImportDrawer: React.FC<{ taskId: number; onClose: () => void; onDone?: () => void }> = ({
   taskId, onClose, onDone
 }) => {
+    const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [detectResult, setDetectResult] = useState<DetectResult | null>(null);
@@ -60,7 +62,7 @@ export const ImportDrawer: React.FC<{ taskId: number; onClose: () => void; onDon
       );
       setJob(j);
     } catch (e: any) {
-      alert('Import failed to start: ' + e.message);
+      toast.push('error', e.userMessage ?? 'Something went wrong');
     } finally {
       setBusy(false);
     }

@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { authApi } from '../../api/auth';
 import { UserPreferencesModal } from '../Preferences/UserPreferencesModal';
+import { useToast } from "./components/Toast/ToastProvider";
 
 export const UserMenu: React.FC = () => {
+    const toast = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
   const { user, refreshToken, clear } = useAuthStore();
@@ -18,7 +20,7 @@ export const UserMenu: React.FC = () => {
         await authApi.logout(refreshToken);
       }
     } catch (err) {
-      console.error('Logout failed', err);
+      toast.push('error', err.userMessage ?? 'Something went wrong');
     } finally {
       clear();
       navigate('/login');

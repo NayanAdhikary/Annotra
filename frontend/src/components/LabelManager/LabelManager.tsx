@@ -3,6 +3,7 @@ import { useAnnotationStore } from '../../store/annotationStore';
 import { labelsApi } from '../../api/labels';
 import { useSaveStatus } from '../../hooks/useSaveStatus';
 import { AttributeEditor, type AttributeDef } from './AttributeEditor';
+import { useToast } from "../Toast/ToastProvider";
 
 const PALETTE = [
   '#FF3B30', '#FF9500', '#FFCC00', '#34C759',
@@ -10,6 +11,7 @@ const PALETTE = [
 ];
 
 export const LabelManager: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+    const toast = useToast();
   const { taskId, labels, upsertLabel, removeLabel } = useAnnotationStore();
   const [name, setName] = useState('');
   const [color, setColor] = useState(PALETTE[0]);
@@ -26,7 +28,7 @@ export const LabelManager: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       upsertLabel(label);
       setName('');
     } catch (e: any) {
-      alert(e?.response?.data?.detail ?? 'Failed to create label');
+      toast.push('error', e.userMessage ?? 'Something went wrong');
     } finally {
       setBusy(false);
     }

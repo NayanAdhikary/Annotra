@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { adminApi, type AdminUser, type Role } from '../../api/admin';
 import { useAuthStore } from '../../store/authStore';
+import { useToast } from "../../components/Toast/ToastProvider";
 
 const ROLES: Role[] = ['admin', 'manager', 'annotator', 'reviewer', 'observer'];
 
 export const AdminUserDetailPage: React.FC = () => {
+    const toast = useToast();
   const { userId } = useParams<{ userId: string }>();
   const id = Number(userId);
   const nav = useNavigate();
@@ -48,7 +50,7 @@ export const AdminUserDetailPage: React.FC = () => {
     if (!pw) return;
     setBusy(true);
     try { await adminApi.resetPassword(id, pw); alert('Password reset. All their sessions were revoked.'); refresh(); }
-    catch (e: any) { alert(e?.response?.data?.detail ?? 'Failed'); }
+    catch (e: any) { toast.push('error', e.userMessage ?? 'Something went wrong'); }
     finally { setBusy(false); }
   };
 
@@ -63,7 +65,7 @@ export const AdminUserDetailPage: React.FC = () => {
     if (!window.confirm(`Permanently delete ${u.email}? This cannot be undone.`)) return;
     setBusy(true);
     try { await adminApi.deleteUser(id); nav('/admin/users'); }
-    catch (e: any) { alert(e?.response?.data?.detail ?? 'Failed'); setBusy(false); }
+    catch (e: any) { toast.push('error', e.userMessage ?? 'Something went wrong'); setBusy(false); }
   };
 
 

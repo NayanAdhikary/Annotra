@@ -33,8 +33,10 @@ import { useZoomToSelection } from '../hooks/useZoomToSelection';
 import { toolConfigApi } from '../api/toolConfig';
 import { useToolConfig } from '../store/toolConfigStore';
 import { ToolTip } from '../components/canvas/ToolTip';
+import { useToast } from "../components/Toast/ToastProvider";
 
 export const AnnotatePage: React.FC = () => {
+    const toast = useToast();
   const { taskId } = useParams<{ taskId: string }>();
   const id = parseInt(taskId || '0', 10);
   const [searchParams] = useSearchParams();
@@ -110,7 +112,7 @@ export const AnnotatePage: React.FC = () => {
       const queue = await reviewApi.queue(id);
       setRejectedCount(queue.stats.rejected);
     } catch (e) {
-      console.error(e);
+      toast.push('error', e.userMessage ?? 'Something went wrong');
     }
   };
   useEffect(() => { refreshRejected(); }, [id]);
@@ -165,7 +167,7 @@ export const AnnotatePage: React.FC = () => {
         setLabels(labels);
         setImages(imgs);
       } catch (e) {
-        console.error('Failed to load task', e);
+        toast.push('error', e.userMessage ?? 'Something went wrong');
       } finally {
         if (!cancelled) setLoading(false);
       }

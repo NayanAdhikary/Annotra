@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { projectsAPI } from '../api/project';
 import { useAuthStore } from '../store/authStore';
+import { useToast } from "../components/Toast/ToastProvider";
 
 const STATUS_STYLE: Record<string, string> = {
   annotation: 'bg-emerald-100 text-emerald-700',
@@ -30,6 +31,7 @@ const Stat: React.FC<{ label: string; value: number; accent?: string }> = ({ lab
 };
 
 export const ProjectDetailPage: React.FC = () => {
+    const toast = useToast();
     const { projectId: rawId } = useParams<{ projectId: string }>();
     const projectId = parseInt(rawId || '0', 10);
     const queryClient = useQueryClient();
@@ -81,8 +83,8 @@ export const ProjectDetailPage: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['projects'] });
             navigate('/');
         } catch (e) {
-            console.error(e);
-            alert("Failed to delete project.");
+            toast.push('error', e.userMessage ?? 'Something went wrong');
+            toast.push('error', e.userMessage ?? 'Something went wrong');
         }
     };
 

@@ -4,6 +4,7 @@ import { tasksApi } from '../api/tasks';
 import type { TaskDetail, Comment, TaskStatus, TaskPriority } from '../api/tasks';
 import { useAuthStore } from '../store/authStore';
 import { TaskComments } from '../components/Tasks/TaskComments';
+import { useToast } from "../components/Toast/ToastProvider";
 
 const STATUS_STYLE: Record<TaskStatus, string> = {
   annotation: 'bg-emerald-100 text-emerald-700',
@@ -15,6 +16,7 @@ const STATUS_STYLE: Record<TaskStatus, string> = {
 const PRIORITIES: TaskPriority[] = ['low', 'normal', 'high', 'urgent'];
 
 export const TaskDetailPage: React.FC = () => {
+    const toast = useToast();
   const { taskId } = useParams<{ taskId: string }>();
   const id = Number(taskId);
   const nav = useNavigate();
@@ -52,7 +54,7 @@ export const TaskDetailPage: React.FC = () => {
   const changeStatus = async (to: TaskStatus) => {
     setBusy(true);
     try { setTask(await tasksApi.transition(id, to)); }
-    catch (e: any) { alert(e?.response?.data?.detail ?? 'Failed'); }
+    catch (e: any) { toast.push('error', e.userMessage ?? 'Something went wrong'); }
     finally { setBusy(false); }
   };
 

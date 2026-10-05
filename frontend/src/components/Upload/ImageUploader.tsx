@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { imagesApi } from '../../api/images';
+import { useToast } from "./components/Toast/ToastProvider";
 
 interface ImageUploaderProps {
   taskId: number;
@@ -9,6 +10,7 @@ interface ImageUploaderProps {
 const VALID_TYPES = ['image/jpeg', 'image/png', 'image/bmp', 'image/webp'];
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({ taskId, onUploadComplete }) => {
+    const toast = useToast();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
@@ -43,7 +45,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ taskId, onUploadCo
           try {
             await imagesApi.upload(taskId, file);
           } catch (e) {
-            console.error('Failed to upload', file.name, e);
+            toast.push('error', e.userMessage ?? 'Something went wrong');
           } finally {
             active--;
             completed++;

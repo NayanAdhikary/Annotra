@@ -4,6 +4,7 @@ import { UserMenu } from './UserMenu';
 import { NotificationBell } from './NotificationBell';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { ImpersonationBanner } from './ImpersonationBanner';
+import { OfflineBanner } from '../OfflineBanner';
 import { useAuthStore } from '../../store/authStore';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -14,6 +15,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
+      <OfflineBanner />
       <ImpersonationBanner />
       <header className="h-14 border-b bg-white flex items-center px-6 gap-6 sticky top-0 z-30">
         <Link to="/" className="flex items-center gap-2 font-semibold text-slate-900">

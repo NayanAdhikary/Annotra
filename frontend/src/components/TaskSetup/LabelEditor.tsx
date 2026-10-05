@@ -4,6 +4,7 @@ import { useAnnotationStore } from '../../store/annotationStore';
 import { useSaveStatus } from '../../hooks/useSaveStatus';
 import { AttributeEditor } from '../LabelManager/AttributeEditor';
 import type { AttributeDef } from '../LabelManager/AttributeEditor';
+import { useToast } from "../Toast/ToastProvider";
 
 const PALETTE = [
   '#FF3B30', '#FF9500', '#FFCC00', '#34C759',
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export const LabelEditor: React.FC<Props> = ({ taskId }) => {
+    const toast = useToast();
   const { labels, upsertLabel, removeLabel } = useAnnotationStore();
   const [name, setName] = useState('');
   const [color, setColor] = useState(PALETTE[0]);
@@ -43,7 +45,7 @@ export const LabelEditor: React.FC<Props> = ({ taskId }) => {
       setAttributes([]);
       setColor(PALETTE[0]);
     } catch (e: any) {
-      alert(formatError(e));
+      toast.push('error', e.userMessage ?? 'Something went wrong');
     } finally {
       setBusy(false);
     }
@@ -54,7 +56,7 @@ export const LabelEditor: React.FC<Props> = ({ taskId }) => {
       const updated = await wrap(() => labelsApi.update(labelId, { attributes: attrs }));
       upsertLabel(updated);
     } catch (e: any) {
-      alert(formatError(e));
+      toast.push('error', e.userMessage ?? 'Something went wrong');
     }
   };
 

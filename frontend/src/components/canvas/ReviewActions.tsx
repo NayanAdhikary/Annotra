@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAnnotationStore } from '../../store/annotationStore';
 import { useCanReview } from '../../hooks/useRoleAccess';
 import { reviewApi } from '../../api/review';
+import { useToast } from "../Toast/ToastProvider";
 
 const REASONS = [
   { key: 'wrong_label',      label: 'Wrong label' },
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export const ReviewActions: React.FC<Props> = ({ onReviewed }) => {
+    const toast = useToast();
   const canReview = useCanReview();
   const ann = useAnnotationStore((s) =>
     s.annotations.find((a) => a.id === s.primaryId)
@@ -41,7 +43,7 @@ export const ReviewActions: React.FC<Props> = ({ onReviewed }) => {
       onReviewed();
       setShowReject(false);
     } catch (e: any) {
-      alert(e?.response?.data?.detail ?? 'Review failed');
+      toast.push('error', e.userMessage ?? 'Something went wrong');
     } finally {
       setBusy(false);
     }

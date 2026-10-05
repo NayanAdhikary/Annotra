@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { UserMenu } from '../Layout/UserMenu';
 import { NotificationBell } from '../Layout/NotificationBell';
+import { OfflineBanner } from '../OfflineBanner';
 
 const NAV = [
   { to: '/admin', label: 'Dashboard', icon: '▤', end: true },
@@ -64,6 +65,7 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
 
     {/* Main */}
     <div className="flex-1 flex flex-col min-w-0">
+      <OfflineBanner />
       <header className="h-14 bg-white border-b flex items-center px-6">
         <h1 className="font-medium text-slate-900">Admin console</h1>
         <div className="ml-auto flex items-center gap-2">

@@ -26,6 +26,7 @@ import { snapPoint } from '../../lib/snap';
 import { useToolConfig } from '../../store/toolConfigStore';
 import { ToolTip } from './ToolTip';
 import { useRecentLabels } from '../../store/recentLabelsStore';
+import { useToast } from "../Toast/ToastProvider";
 
 interface Props {
   taskId: number;
@@ -36,6 +37,7 @@ interface Props {
 }
 
 export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, width, height }) => {
+    const toast = useToast();
   const [img] = useImage(imageUrl);
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -154,11 +156,11 @@ export const AnnotationCanvas: React.FC<Props> = ({ taskId, imageId, imageUrl, w
         );
         attachServerId(localId, server.id);
       } catch (e: any) {
-        console.error('persist failed', e);
+        toast.push('error', e.userMessage ?? 'Something went wrong');
         // Rollback via history store (and pop future so it can't be redone)
         useHistoryStore.getState().undo();
         useHistoryStore.setState({ future: [] });
-        alert(e?.response?.data?.detail ?? "Couldn't save. Please retry.");
+        toast.push('error', e.userMessage ?? 'Something went wrong');
       }
     },
     [taskId, imageId, frame, activeLabelId, execute, attachServerId, wrap],
