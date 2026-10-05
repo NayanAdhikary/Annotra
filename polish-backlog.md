@@ -3,7 +3,14 @@
 Last audit: 2026-10-05
 
 ## P0 — Blocks users, breaks app
-- **Workspace (image)**: "Task with zero images: workspace shows 'Upload images' CTA" — Currently, if a task has zero images, the `AnnotatePage` doesn't provide an upload CTA directly inside the workspace; it just fails to load a current image and may error or show a blank state.
+*(All P0s fixed)*
+
+## Fixed (P0)
+- **Workspace (image)**: "Task with zero images: workspace shows 'Upload images' CTA" — Added 'Upload images' CTA linking to setup page.
+- **Projects**: "Broken route: Project not found" — Updated `_assert_project_access` to allow annotators to view projects they have assigned tasks in.
+- **Frontend**: "Spinner that never resolves" — Added `.catch(console.error)` to all unhandled `.then()` fetch chains across the frontend.
+- **Backend**: "500 errors with no message" — Added a global exception handler in `main.py` that returns a generic JSON message with an error ID instead of a raw traceback.
+- **Backend**: "Task state stuck" — Updated `task_workflow.py` to check `TaskAssignment` roles instead of just global `user.role` to permit transitions like reviewer rejecting a task.
 
 ## P1 — Friction, all users hit
 - **Error states**: "404 route: 'Page not found' with home link" — `App.tsx` simply catches all unknown routes (`path="*"`) and forcefully navigates to `/` without explaining why.
