@@ -1,3 +1,9 @@
 .env
 .env.prod
 .env.*.local
+
+backend/venv/
+backend/annotra.db
+backend/out.json
+frontend/node_modules/
+__pycache__/
