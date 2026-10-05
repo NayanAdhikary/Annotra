@@ -53,10 +53,22 @@ async def _assert_project_access(db: AsyncSession, project_id: int, user: User) 
     project = await db.get(Project, project_id)
     if project is None:
         raise HTTPException(404, "Project not found")
-    if project.owner_id != user.id and user.role not in (
-        UserRole.ADMIN.value, UserRole.MANAGER.value,
-    ):
+    if user.role in (UserRole.ADMIN.value, UserRole.MANAGER.value):
+        return project
+    if project.owner_id == user.id:
+        return project
+
+    # Check if user has any assigned tasks in this project
+    from app.models.task_assignment import TaskAssignment
+    assignment = (await db.execute(
+        select(TaskAssignment).join(Task, Task.id == TaskAssignment.task_id)
+        .where(Task.project_id == project_id, TaskAssignment.user_id == user.id)
+        .limit(1)
+    )).scalar_one_or_none()
+    
+    if assignment is None:
         raise HTTPException(403, "Not your project")
+        
     return project
 
 
