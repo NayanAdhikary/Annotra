@@ -99,7 +99,14 @@ export const ProjectDetailPage: React.FC = () => {
 
             <div className="flex justify-between items-start mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 mb-2">{project.name}</h1>
+                    <div className="flex items-center gap-3 mb-2">
+                        <h1 className="text-2xl font-bold text-slate-900">{project.name}</h1>
+                        {project.has_tool_override && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                                🔧 Custom tools
+                            </span>
+                        )}
+                    </div>
                     {project.description && <p className="text-slate-600">{project.description}</p>}
                     {!isAdmin && (
                         <p className="text-sm text-slate-400 mt-1">Showing tasks assigned to you</p>
@@ -107,6 +114,12 @@ export const ProjectDetailPage: React.FC = () => {
                 </div>
                 {isAdmin && (
                     <div className="flex gap-3 items-center">
+                        <Link
+                            to={`/projects/${project.id}/settings`}
+                            className="px-3 py-1.5 text-sm border border-slate-300 rounded-md hover:bg-slate-50 flex items-center gap-1"
+                        >
+                            ⚙ Project settings
+                        </Link>
                         <button
                             onClick={handleDeleteProject}
                             className="px-4 py-2 border border-red-300 text-red-600 rounded-md hover:bg-red-50 font-medium whitespace-nowrap"

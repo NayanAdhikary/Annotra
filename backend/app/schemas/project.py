@@ -23,6 +23,7 @@ class ProjectResponse(BaseModel):
     completed_task_count: int = 0
     in_review_task_count: int = 0
     annotation_task_count: int = 0
+    has_tool_override: bool = False
 
     class Config:
         from_attributes = True

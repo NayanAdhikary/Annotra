@@ -82,25 +82,26 @@ export const AnnotatePage: React.FC = () => {
     );
   }, [id, currentImageId, refreshKey]);
 
+  const [projectId, setProjectId] = useState<number | null>(null);
+
   useEffect(() => {
     tasksApi.get(id).then((t) => {
       setTaskStatusLocal(t.status);
       setTaskStatus(t.status);
+      setProjectId(t.project_id);
     }).catch(e => console.error(e));
   }, [id, setTaskStatus]);
   
   const loadConfig = useToolConfig((s) => s.load);
   const config = useToolConfig((s) => s.config);
-  // Mock org for now since useOrgStore is not fully implemented
-  const org = { id: 1 };
 
   useEffect(() => {
-    if (!org) return;
-    toolConfigApi.effective(org.id).then((cfg) => {
+    if (!projectId) return;
+    toolConfigApi.effectiveForProject(projectId).then((cfg) => {
       loadConfig(cfg);
       useAnnotationStore.getState().setBrushSize(cfg.brush_size_default);
     }).catch(console.error);
-  }, [org.id, loadConfig]);
+  }, [projectId, loadConfig]);
   
   const [rejectedCount, setRejectedCount] = useState(0);
 

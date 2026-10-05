@@ -15,6 +15,13 @@ from app.schemas.project import (
     CommentCreate, CommentResponse, CommentUpdate, MyTaskRow
 )
 from app.services.task_workflow import transition_task
+from app.models.tool_config import ToolConfig
+
+async def _project_has_tool_override(db: AsyncSession, project_id: int) -> bool:
+    row = (await db.execute(
+        select(ToolConfig).where(ToolConfig.project_id == project_id)
+    )).scalar_one_or_none()
+    return row is not None
 
 router = APIRouter()
 
@@ -132,6 +139,7 @@ async def list_projects(
             completed_task_count=st.get('completed', 0),
             in_review_task_count=st.get('review', 0),
             annotation_task_count=st.get('annotation', 0),
+            has_tool_override=await _project_has_tool_override(db, p.id),
         ))
     return out
 
@@ -178,6 +186,7 @@ async def get_project(
         completed_task_count=cc,
         in_review_task_count=rc,
         annotation_task_count=ac,
+        has_tool_override=await _project_has_tool_override(db, project.id),
     )
 
 

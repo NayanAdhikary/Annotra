@@ -11,6 +11,7 @@ export interface Project {
     in_review_task_count: number;
     annotation_task_count: number;
     created_at: string;
+    has_tool_override?: boolean;
 }
 
 export interface Task {

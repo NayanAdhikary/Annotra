@@ -9,6 +9,8 @@ import { VideoPlayer } from '../components/Video/VideoPlayer';
 import { TrackList } from '../components/Video/TrackList';
 import { SaveIndicator } from '../components/Status/SaveIndicator';
 import { UserMenu } from '../components/Layout/UserMenu';
+import { toolConfigApi } from '../api/toolConfig';
+import { useToolConfig } from '../store/toolConfigStore';
 
 interface Video {
   id: number; filename: string;
@@ -33,6 +35,16 @@ export const VideoAnnotatePage: React.FC = () => {
   const upsertTrack = useVideoStore((s) => s.upsertTrack);
   const setLabels = useAnnotationStore((s) => s.setLabels);
   const setTask = useAnnotationStore((s) => s.setTask);
+
+  const loadConfig = useToolConfig((s) => s.load);
+
+  useEffect(() => {
+    if (!projectId) return;
+    toolConfigApi.effectiveForProject(projectId).then((cfg) => {
+      loadConfig(cfg);
+      useAnnotationStore.getState().setBrushSize(cfg.brush_size_default);
+    }).catch(console.error);
+  }, [projectId, loadConfig]);
 
   useEffect(() => {
     let cancelled = false;

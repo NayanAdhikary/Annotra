@@ -87,8 +87,13 @@ export const ProjectsPage: React.FC = () => {
                         <button
                             key={p.id}
                             onClick={() => openProject(p.id)}
-                            className="block w-full text-left bg-white border border-slate-200 rounded-lg p-5 hover:border-indigo-400 hover:shadow-sm transition group"
+                            className="block w-full text-left bg-white border border-slate-200 rounded-lg p-5 hover:border-indigo-400 hover:shadow-sm transition group relative"
                         >
+                            {p.has_tool_override && (
+                                <span className="absolute top-3 right-3 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                                    🔧 Custom tools
+                                </span>
+                            )}
                             <h3 className="text-lg font-semibold text-slate-900 group-hover:text-indigo-600 mb-2">
                                 {p.name}
                             </h3>

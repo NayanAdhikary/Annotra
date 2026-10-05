@@ -9,9 +9,11 @@ class ToolConfig(Base):
     __tablename__ = "tool_configs"
 
     id      = Column(Integer, primary_key=True, autoincrement=True)
-    org_id  = Column(BigInteger, ForeignKey("organizations.id", ondelete="CASCADE"),
-                     nullable=False, unique=True, index=True)
-
+    org_id     = Column(BigInteger, ForeignKey("organizations.id", ondelete="CASCADE"),
+                        nullable=False, index=True)
+    project_id = Column(BigInteger, ForeignKey("projects.id", ondelete="CASCADE"),
+                        nullable=True, index=True)
+    # NULL = org default. Non-NULL = project override.
     enabled_tools = Column(JSON, default=lambda: [
         "rectangle", "polygon", "polyline", "points", "brush", "eraser"
     ])
@@ -34,6 +36,9 @@ class ToolConfig(Base):
     })
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    __table_args__ = (
+        UniqueConstraint("org_id", "project_id", name="uq_tool_config_org_project"),
+    )
 
 class UserPreferences(Base):
     __tablename__ = "user_preferences"

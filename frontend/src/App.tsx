@@ -11,6 +11,7 @@ const LoginPage = React.lazy(() => import('./pages/LoginPage').then(m => ({ defa
 const RegisterPage = React.lazy(() => import('./pages/RegisterPage').then(m => ({ default: m.RegisterPage })));
 const ProjectsPage = React.lazy(() => import('./pages/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
 const ProjectDetailPage = React.lazy(() => import('./pages/ProjectDetailPage').then(m => ({ default: m.ProjectDetailPage })));
+const ProjectSettingsPage = React.lazy(() => import('./pages/ProjectSettingsPage').then(m => ({ default: m.ProjectSettingsPage })));
 const TaskSetupPage = React.lazy(() => import('./pages/TaskSetupPage').then(m => ({ default: m.TaskSetupPage })));
 const TaskToolSetupPage = React.lazy(() => import('./pages/TaskToolSetupPage').then(m => ({ default: m.TaskToolSetupPage })));
 const AnnotatePage = React.lazy(() => import('./pages/AnnotatePage').then(m => ({ default: m.AnnotatePage })));
@@ -65,6 +66,9 @@ export const App: React.FC = () => {
         } />
         <Route path="/projects/:projectId" element={
           <ProtectedRoute><AppLayout><SuspenseWrapper><ProjectDetailPage /></SuspenseWrapper></AppLayout></ProtectedRoute>
+        } />
+        <Route path="/projects/:projectId/settings" element={
+          <ProtectedRoute><AppLayout><SuspenseWrapper><ProjectSettingsPage /></SuspenseWrapper></AppLayout></ProtectedRoute>
         } />
         <Route path="/tasks/:taskId/detail" element={
           <ProtectedRoute><AppLayout><SuspenseWrapper><TaskDetailPage /></SuspenseWrapper></AppLayout></ProtectedRoute>

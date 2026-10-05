@@ -29,6 +29,12 @@ export const toolConfigApi = {
     (await api.get('/api/me/preferences')).data,
   savePrefs: async (overrides: Partial<ToolConfig>) =>
     (await api.put('/api/me/preferences', { overrides })).data,
-  resetPrefs: async (): Promise<void> =>
-    api.delete('/api/me/preferences'),
+  getProject: async (projectId: number): Promise<ToolConfig & { _has_project_override?: boolean }> =>
+    (await api.get(`/api/projects/${projectId}/tool-config`)).data,
+  updateProject: async (projectId: number, patch: Partial<ToolConfig>): Promise<ToolConfig> =>
+    (await api.patch(`/api/projects/${projectId}/tool-config`, patch)).data,
+  resetProject: async (projectId: number): Promise<void> =>
+    api.delete(`/api/projects/${projectId}/tool-config`),
+  effectiveForProject: async (projectId: number): Promise<ToolConfig> =>
+    (await api.get(`/api/projects/${projectId}/effective-config`)).data,
 };
