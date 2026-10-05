@@ -187,6 +187,9 @@ async def create_user(
     await db.commit()
     await db.refresh(user)
 
+    from app.services import cache
+    await cache.invalidate_prefix("admin_stats")
+
     return AdminUserDetail(
         id=user.id, email=user.email, username=user.username, full_name=user.full_name,
         role=user.role, is_active=user.is_active,
@@ -268,6 +271,10 @@ async def update_user(
         )
     await db.commit()
     await db.refresh(target)
+    
+    from app.services import cache
+    await cache.invalidate_prefix("admin_stats")
+    
     return await get_user(target.id, db, admin)
 
 
@@ -482,31 +489,19 @@ async def list_all_projects(
     owner_ids = list({p.owner_id for p in projects})
     users_dict = dict((await db.execute(select(User.id, User).where(User.id.in_(owner_ids)))).all())
     
-    task_counts = dict((await db.execute(select(Task.project_id, func.count()).where(Task.project_id.in_(p_ids)).group_by(Task.project_id))).all())
-    
-    img_counts = dict((await db.execute(
-        select(Task.project_id, func.count(ImageAsset.id))
-        .join(Task, Task.id == ImageAsset.task_id)
-        .where(Task.project_id.in_(p_ids))
-        .group_by(Task.project_id)
-    )).all())
-    
-    ann_counts = dict((await db.execute(
-        select(Task.project_id, func.count(Annotation.id))
-        .join(Task, Task.id == Annotation.task_id)
-        .where(Task.project_id.in_(p_ids))
-        .group_by(Task.project_id)
-    )).all())
+    from app.routers.projects import _project_stats_bulk
+    stats = await _project_stats_bulk(db, p_ids)
 
     for p in projects:
         owner = users_dict.get(p.owner_id)
+        st = stats.get(p.id, {"task_count": 0, "image_count": 0, "annotation": 0})
         out.append(AdminProjectRow(
             id=p.id, name=p.name, description=p.description,
             owner_id=p.owner_id,
             owner_email=owner.email if owner else None,
             owner_name=(owner.full_name or owner.username) if owner else None,
-            task_count=task_counts.get(p.id, 0), image_count=img_counts.get(p.id, 0),
-            annotation_count=ann_counts.get(p.id, 0), created_at=p.created_at,
+            task_count=st.get("task_count", 0), image_count=st.get("image_count", 0),
+            annotation_count=st.get("annotation", 0), created_at=p.created_at,
         ))
     return out
 
@@ -599,9 +594,8 @@ async def list_all_tasks(
     p_ids = list({t.project_id for t in tasks})
     projects_dict = dict((await db.execute(select(Project.id, Project.name).where(Project.id.in_(p_ids)))).all())
     
-    img_counts = dict((await db.execute(select(ImageAsset.task_id, func.count()).where(ImageAsset.task_id.in_(t_ids)).group_by(ImageAsset.task_id))).all())
-    label_counts = dict((await db.execute(select(Label.task_id, func.count()).where(Label.task_id.in_(t_ids)).group_by(Label.task_id))).all())
-    ann_counts = dict((await db.execute(select(Annotation.task_id, func.count(func.distinct(Annotation.image_id))).where(Annotation.task_id.in_(t_ids)).group_by(Annotation.task_id))).all())
+    from app.routers.projects import _task_stats_bulk
+    stats = await _task_stats_bulk(db, t_ids)
     
     assigns = (await db.execute(select(TaskAssignment).where(TaskAssignment.task_id.in_(t_ids)))).scalars().all()
     user_ids = list({a.user_id for a in assigns})
@@ -617,14 +611,15 @@ async def list_all_tasks(
         })
 
     for t in tasks:
+        st = stats.get(t.id, {"image_count": 0, "label_count": 0, "annotated_count": 0})
         assignees = assigns_by_task.get(t.id, [])
         out.append(AdminTaskRow(
             id=t.id, project_id=t.project_id,
             project_name=projects_dict.get(t.project_id, ""),
             name=t.name, task_type=t.task_type, status=t.status,
-            image_count=img_counts.get(t.id, 0), 
-            label_count=label_counts.get(t.id, 0), 
-            annotated_count=ann_counts.get(t.id, 0),
+            image_count=st.get("image_count", 0), 
+            label_count=st.get("label_count", 0), 
+            annotated_count=st.get("annotated_count", 0),
             annotator_count=sum(1 for a in assignees if a["role"] == "annotator"),
             reviewer_count=sum(1 for a in assignees if a["role"] == "reviewer"),
             assignees=assignees,
@@ -683,6 +678,9 @@ async def assign_task(
                 request=request)
     await db.commit()
     await db.refresh(assignment)
+
+    from app.services import cache
+    await cache.invalidate_prefix("admin_stats")
 
     return TaskAssignmentResponse(
         id=assignment.id, task_id=task_id, user_id=payload.user_id,
@@ -1447,4 +1445,8 @@ async def bulk_assign(
         request=request,
     )
     await db.commit()
+    
+    from app.services import cache
+    await cache.invalidate_prefix("admin_stats")
+    
     return {"ok": True, "assigned": len(desired)}

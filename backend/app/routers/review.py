@@ -105,6 +105,10 @@ async def review_annotation(
         )
         await db.commit()
 
+    from app.services import cache
+    await cache.invalidate("task_detail", ann.task_id)
+    await cache.invalidate("review_queue", ann.task_id)
+
     return ann
 
 
@@ -132,6 +136,10 @@ async def reset_review(
                 request=request)
     await db.commit()
     await db.refresh(ann)
+    from app.services import cache
+    await cache.invalidate("task_detail", ann.task_id)
+    await cache.invalidate("review_queue", ann.task_id)
+
     return ann
 
 

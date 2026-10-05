@@ -175,12 +175,13 @@ export const AnnotatePage: React.FC = () => {
 
   useEffect(() => {
     if (!currentImageId) return;
+    let cancelled = false;
     annotationsApi.listForImage(id, currentImageId).then((anns) => {
-      const others = useAnnotationStore.getState().annotations.filter(
-        (a) => a.imageId !== currentImageId,
-      );
-      useAnnotationStore.getState().setAnnotations([...others, ...anns]);
-    });
+      if (!cancelled) {
+        useAnnotationStore.getState().setAnnotations(anns);
+      }
+    }).catch(console.error);
+    return () => { cancelled = true; };
   }, [id, currentImageId]);
 
   useEffect(() => {

@@ -1,6 +1,6 @@
-import json
 import hashlib
-from typing import Any, Callable, Awaitable
+import json
+from typing import Any, Awaitable, Callable
 from app.core.rate_limit import get_redis
 
 
@@ -15,7 +15,6 @@ async def get_or_set(
     ttl: int,
     fn: Callable[[], Awaitable[Any]],
 ) -> Any:
-    """Return cached JSON, or compute via `fn` and cache the result."""
     redis = get_redis()
     key = _key(namespace, *parts)
     try:
@@ -42,7 +41,6 @@ async def invalidate(namespace: str, *parts) -> None:
 
 
 async def invalidate_prefix(namespace: str) -> None:
-    """Delete every key under a namespace. Use sparingly."""
     redis = get_redis()
     try:
         cursor = 0

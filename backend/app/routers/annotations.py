@@ -88,6 +88,10 @@ async def create_annotation(
 
     await db.commit()
     await db.refresh(ann)
+    from app.services import cache
+    await cache.invalidate("task_detail", task_id)
+    await cache.invalidate("review_queue", task_id)
+
     return ann
 
 
@@ -119,6 +123,10 @@ async def bulk_create(task_id: int, payload: BulkAnnotationCreate,
     await db.commit()
     for a in created:
         await db.refresh(a)
+    from app.services import cache
+    await cache.invalidate("task_detail", task_id)
+    await cache.invalidate("review_queue", task_id)
+
     return created
 
 
@@ -181,6 +189,10 @@ async def update_annotation(ann_id: int, payload: AnnotationUpdate,
 
     await db.commit()
     await db.refresh(ann)
+    from app.services import cache
+    await cache.invalidate("task_detail", ann.task_id)
+    await cache.invalidate("review_queue", ann.task_id)
+
     return ann
 
 
@@ -205,6 +217,10 @@ async def delete_annotation(ann_id: int,
         if count == 0:
             await reset_to_pending(db, task_id, image_id, user.id)
             await db.commit()
+
+    from app.services import cache
+    await cache.invalidate("task_detail", task_id)
+    await cache.invalidate("review_queue", task_id)
 
 
 @router.get("/tasks/{task_id}/annotations")
@@ -369,6 +385,10 @@ async def bulk_patch(
             setattr(a, k, v)
 
     await db.commit()
+    from app.services import cache
+    await cache.invalidate("task_detail", task_id)
+    await cache.invalidate("review_queue", task_id)
+
     return {"updated": len(anns), "ids": [a.id for a in anns]}
 
 
@@ -398,4 +418,8 @@ async def bulk_delete(
                 resource_type="annotation", meta={"ids": ids, "count": res.rowcount},
                 request=request)
     await db.commit()
+    from app.services import cache
+    await cache.invalidate("task_detail", task_id)
+    await cache.invalidate("review_queue", task_id)
+
     return {"deleted": res.rowcount}

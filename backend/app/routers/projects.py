@@ -26,27 +26,43 @@ async def _project_has_tool_override(db: AsyncSession, project_id: int) -> bool:
 router = APIRouter()
 
 
-async def _project_stats(db: AsyncSession, project_id: int) -> tuple[int, int, int, int, int]:
-    task_count = (await db.execute(
-        select(func.count()).select_from(Task).where(Task.project_id == project_id)
-    )).scalar_one()
-    image_count = (await db.execute(
-        select(func.count()).select_from(ImageAsset)
-        .join(Task, Task.id == ImageAsset.task_id)
-        .where(Task.project_id == project_id)
-    )).scalar_one()
+async def _project_stats_bulk(
+    db: AsyncSession, project_ids: list[int],
+) -> dict[int, dict]:
+    """
+    Returns {project_id: {"task_count", "image_count", "completed", "review", "annotation"}}
+    in 4 queries total, regardless of how many projects.
+    """
+    if not project_ids:
+        return {}
 
-    statuses = (await db.execute(
-        select(Task.status, func.count()).where(Task.project_id == project_id).group_by(Task.status)
+    # task counts + status counts per project (one query)
+    status_rows = (await db.execute(
+        select(Task.project_id, Task.status, func.count())
+        .where(Task.project_id.in_(project_ids))
+        .group_by(Task.project_id, Task.status)
     )).all()
-    by_status = {s: c for s, c in statuses}
 
-    return (
-        task_count, image_count,
-        by_status.get("completed", 0),
-        by_status.get("review", 0),
-        by_status.get("annotation", 0),
-    )
+    out: dict[int, dict] = {
+        pid: {"task_count": 0, "image_count": 0, "completed": 0, "review": 0, "annotation": 0}
+        for pid in project_ids
+    }
+    for pid, status, cnt in status_rows:
+        out[pid]["task_count"] += cnt
+        if status in ("completed", "review", "annotation"):
+            out[pid][status] = cnt
+
+    # image counts per project (join once)
+    img_rows = (await db.execute(
+        select(Task.project_id, func.count(ImageAsset.id))
+        .join(ImageAsset, ImageAsset.task_id == Task.id)
+        .where(Task.project_id.in_(project_ids))
+        .group_by(Task.project_id)
+    )).all()
+    for pid, cnt in img_rows:
+        out[pid]["image_count"] = cnt
+
+    return out
 
 
 async def _assert_project_access(db: AsyncSession, project_id: int, user: User) -> Project:
@@ -121,32 +137,15 @@ async def list_projects(
         return out
         
     p_ids = [p.id for p in projects]
-    task_counts = dict((await db.execute(select(Task.project_id, func.count()).where(Task.project_id.in_(p_ids)).group_by(Task.project_id))).all())
+    stats = await _project_stats_bulk(db, p_ids)
     
-    img_counts = dict((await db.execute(
-        select(Task.project_id, func.count(ImageAsset.id))
-        .join(Task, Task.id == ImageAsset.task_id)
-        .where(Task.project_id.in_(p_ids))
-        .group_by(Task.project_id)
-    )).all())
-    
-    status_counts = (await db.execute(
-        select(Task.project_id, Task.status, func.count())
-        .where(Task.project_id.in_(p_ids))
-        .group_by(Task.project_id, Task.status)
-    )).all()
-    
-    by_status = {}
-    for pid, st, c in status_counts:
-        by_status.setdefault(pid, {})[st] = c
-
     for p in projects:
-        st = by_status.get(p.id, {})
+        st = stats.get(p.id, {"task_count": 0, "image_count": 0, "completed": 0, "review": 0, "annotation": 0})
         out.append(ProjectResponse(
             id=p.id, name=p.name, description=p.description,
             owner_id=p.owner_id, 
-            task_count=task_counts.get(p.id, 0), 
-            image_count=img_counts.get(p.id, 0),
+            task_count=st.get("task_count", 0), 
+            image_count=st.get("image_count", 0),
             created_at=p.created_at,
             completed_task_count=st.get('completed', 0),
             in_review_task_count=st.get('review', 0),
@@ -190,14 +189,15 @@ async def get_project(
     user: User = Depends(get_current_user),
 ):
     project = await _assert_project_access(db, project_id, user)
-    tc, ic, cc, rc, ac = await _project_stats(db, project_id)
+    stats = await _project_stats_bulk(db, [project.id])
+    st = stats.get(project.id, {"task_count": 0, "image_count": 0, "completed": 0, "review": 0, "annotation": 0})
     return ProjectResponse(
         id=project.id, name=project.name, description=project.description,
-        owner_id=project.owner_id, task_count=tc, image_count=ic,
+        owner_id=project.owner_id, task_count=st.get("task_count", 0), image_count=st.get("image_count", 0),
         created_at=project.created_at,
-        completed_task_count=cc,
-        in_review_task_count=rc,
-        annotation_task_count=ac,
+        completed_task_count=st.get("completed", 0),
+        in_review_task_count=st.get("review", 0),
+        annotation_task_count=st.get("annotation", 0),
         has_tool_override=await _project_has_tool_override(db, project.id),
     )
 
@@ -219,23 +219,45 @@ async def delete_project(
 
 # ---------------- Tasks ----------------
 
-async def _task_stats(db: AsyncSession, task_id: int) -> tuple[int, int, int]:
-    ic = (await db.execute(
-        select(func.count()).select_from(ImageAsset).where(ImageAsset.task_id == task_id)
-    )).scalar_one()
-    lc = (await db.execute(
-        select(func.count()).select_from(Label).where(Label.task_id == task_id)
-    )).scalar_one()
-    ac = (await db.execute(
-        select(func.count(func.distinct(Annotation.image_id)))
-        .where(Annotation.task_id == task_id)
-    )).scalar_one()
-    return ic, lc, ac
+async def _task_stats_bulk(
+    db: AsyncSession, task_ids: list[int],
+) -> dict[int, dict]:
+    if not task_ids:
+        return {}
+
+    out = {tid: {"image_count": 0, "label_count": 0, "annotated_count": 0} for tid in task_ids}
+
+    img_rows = (await db.execute(
+        select(ImageAsset.task_id, func.count())
+        .where(ImageAsset.task_id.in_(task_ids))
+        .group_by(ImageAsset.task_id)
+    )).all()
+    for tid, cnt in img_rows:
+        out[tid]["image_count"] = cnt
+
+    label_rows = (await db.execute(
+        select(Label.task_id, func.count())
+        .where(Label.task_id.in_(task_ids))
+        .group_by(Label.task_id)
+    )).all()
+    for tid, cnt in label_rows:
+        out[tid]["label_count"] = cnt
+
+    ann_rows = (await db.execute(
+        select(Annotation.task_id, func.count(func.distinct(Annotation.image_id)))
+        .where(Annotation.task_id.in_(task_ids))
+        .group_by(Annotation.task_id)
+    )).all()
+    for tid, cnt in ann_rows:
+        out[tid]["annotated_count"] = cnt
+
+    return out
 
 async def _task_response(db: AsyncSession, t: Task) -> TaskResponse:
     project = await db.get(Project, t.project_id)
-    ic, lc, ac = await _task_stats(db, t.id)
-
+    stats = await _task_stats_bulk(db, [t.id])
+    st = stats.get(t.id, {"image_count": 0, "label_count": 0, "annotated_count": 0})
+    ic, lc, ac = st["image_count"], st["label_count"], st["annotated_count"]
     comment_count = (await db.execute(
         select(func.count()).select_from(TaskComment).where(TaskComment.task_id == t.id)
     )).scalar_one()
@@ -315,9 +337,7 @@ async def list_tasks(
         return out
         
     t_ids = [t.id for t in tasks]
-    img_counts = dict((await db.execute(select(ImageAsset.task_id, func.count()).where(ImageAsset.task_id.in_(t_ids)).group_by(ImageAsset.task_id))).all())
-    label_counts = dict((await db.execute(select(Label.task_id, func.count()).where(Label.task_id.in_(t_ids)).group_by(Label.task_id))).all())
-    ann_counts = dict((await db.execute(select(Annotation.task_id, func.count(func.distinct(Annotation.image_id))).where(Annotation.task_id.in_(t_ids)).group_by(Annotation.task_id))).all())
+    stats = await _task_stats_bulk(db, t_ids)
     
     com_counts = dict((await db.execute(select(TaskComment.task_id, func.count()).where(TaskComment.task_id.in_(t_ids)).group_by(TaskComment.task_id))).all())
     open_com_counts = dict((await db.execute(select(TaskComment.task_id, func.count()).where(TaskComment.task_id.in_(t_ids), TaskComment.resolved.is_(False)).group_by(TaskComment.task_id))).all())
@@ -336,6 +356,7 @@ async def list_tasks(
         })
 
     for t in tasks:
+        st = stats.get(t.id, {"image_count": 0, "label_count": 0, "annotated_count": 0})
         assignees = assigns_by_task.get(t.id, [])
         out.append(TaskResponse(
             id=t.id, project_id=t.project_id,
@@ -343,8 +364,8 @@ async def list_tasks(
             name=t.name, task_type=t.task_type, status=t.status,
             priority=t.priority, due_at=t.due_at,
             description=t.description, instructions=t.instructions,
-            image_count=img_counts.get(t.id, 0), label_count=label_counts.get(t.id, 0),
-            annotated_count=ann_counts.get(t.id, 0),
+            image_count=st.get("image_count", 0), label_count=st.get("label_count", 0),
+            annotated_count=st.get("annotated_count", 0),
             comment_count=com_counts.get(t.id, 0), open_comment_count=open_com_counts.get(t.id, 0),
             assignees=assignees,
             archived_at=t.archived_at, completed_at=t.completed_at,
@@ -394,7 +415,7 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_db),
         # datetime fields need to be handled, but model_dump with mode='json' is great
         return resp.model_dump(mode='json')
         
-    data = await cache.get_or_set("task_stats", (task_id,), 10, compute)
+    data = await cache.get_or_set("task_detail", (task_id,), 10, compute)
     return TaskResponse(**data)
 
 
@@ -494,7 +515,7 @@ async def task_transition(
             )
 
     await cache.invalidate_prefix("admin_stats")
-    await cache.invalidate("task_stats", task_id)
+    await cache.invalidate("task_detail", task_id)
     await audit(db, user=user, action="task.transition",
                 resource_type="task", resource_id=t.id,
                 meta={"from": old_status, "to": t.status}, request=request)
