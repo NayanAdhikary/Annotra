@@ -1,7 +1,28 @@
-from celery import Celery
 from app.config import settings
+from app.core.logging import configure_logging
 
-celery_app = Celery("annotra", broker=settings.REDIS_URL, backend=settings.REDIS_URL)
+configure_logging()
+
+import sentry_sdk
+from sentry_sdk.integrations.celery import CeleryIntegration
+
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENVIRONMENT,
+        release=settings.RELEASE,
+        traces_sample_rate=0.05,
+        send_default_pii=False,
+        integrations=[CeleryIntegration()],
+    )
+
+from celery import Celery
+
+celery_app = Celery(
+    "annotra",
+    broker=settings.REDIS_URL,
+    backend=settings.REDIS_URL,
+)
 
 celery_app.conf.update(
     imports=[

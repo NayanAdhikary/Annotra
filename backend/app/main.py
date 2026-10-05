@@ -1,4 +1,7 @@
-from fastapi import FastAPI
+from app.core.logging import configure_logging
+configure_logging()
+
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 import os, sys, time
 from contextlib import asynccontextmanager
@@ -22,19 +25,19 @@ for sub in ("images", "videos", "frames", "exports", "imports", "models"):
 # Sentry (no-op when SENTRY_DSN is empty)
 # ---------------------------------------------------------------------------
 import sentry_sdk
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-from sentry_sdk.integrations.celery import CeleryIntegration
+
+from app.config import settings
 
 if settings.SENTRY_DSN:
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
         environment=settings.ENVIRONMENT,
         release=settings.RELEASE,
-        traces_sample_rate=0.05,
-        profiles_sample_rate=0.05,
-        integrations=[FastApiIntegration(), SqlalchemyIntegration(), CeleryIntegration()],
-        send_default_pii=False,
+        traces_sample_rate=0.05,          # 5% of requests get a full trace
+        profiles_sample_rate=0.05,        # 5% get a profile
+        send_default_pii=False,           # never send emails/IPs by default
+        attach_stacktrace=True,
+        max_breadcrumbs=50,
     )
 
 # ---------------------------------------------------------------------------
@@ -58,19 +61,16 @@ async def lifespan(application: FastAPI):
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Annotra API", version="0.1.0", lifespan=lifespan)
 
-from fastapi.responses import JSONResponse
-import traceback
-import logging
-logger = logging.getLogger(__name__)
+from fastapi.exceptions import RequestValidationError
+from app.core.exceptions import (
+    http_exception_handler,
+    validation_exception_handler,
+    unhandled_exception_handler,
+)
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    error_id = str(int(time.time()))
-    logger.error(f"Unhandled Exception [ID: {error_id}]: {exc}\n{traceback.format_exc()}")
-    return JSONResponse(
-        status_code=500, 
-        content={"detail": "Something went wrong. Please try again later.", "error_id": error_id}
-    )
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 # Timing header (visible in browser DevTools Network tab)
 class TimingMiddleware(BaseHTTPMiddleware):
@@ -134,3 +134,10 @@ app.include_router(tool_config.router,   prefix="/api",       tags=["tool-config
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+@app.get("/api/__force_error")
+async def _force_error():
+    """Debug-only. Enabled when ALLOW_DEBUG_ROUTES=1."""
+    if os.getenv("ALLOW_DEBUG_ROUTES") != "1":
+        raise HTTPException(404)
+    raise RuntimeError("Forced error for testing")

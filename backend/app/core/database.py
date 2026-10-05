@@ -19,8 +19,8 @@ else:
     engine = create_async_engine(
         settings.DATABASE_URL,
         echo=False,
-        pool_size=20,           # base connections kept alive
-        max_overflow=10,        # burst capacity
+        pool_size=10,           # base connections kept alive (lowered for Celery headroom)
+        max_overflow=5,         # burst capacity
         pool_pre_ping=True,     # detect dead connections after DB restart
         pool_recycle=1800,      # recycle every 30 min (connection lifetime)
         pool_timeout=30,        # wait at most 30s for a free connection
@@ -31,20 +31,8 @@ async_session = async_sessionmaker(
     expire_on_commit=False,   # avoid a refresh round-trip after every commit
 )
 
-import logging, time
-from sqlalchemy import event
-
-logger = logging.getLogger("sql.timing")
-
-@event.listens_for(engine.sync_engine, "before_cursor_execute")
-def _before(conn, cursor, statement, parameters, context, executemany):
-    conn.info.setdefault("query_start", []).append(time.perf_counter())
-
-@event.listens_for(engine.sync_engine, "after_cursor_execute")
-def _after(conn, cursor, statement, parameters, context, executemany):
-    total = time.perf_counter() - conn.info["query_start"].pop()
-    if total > 0.5:   # log queries > 500ms
-        logger.warning("SLOW QUERY %.3fs: %s", total, statement[:200])
+from app.core.sql_logging import attach_slow_query_logger
+attach_slow_query_logger(engine)
 
 class Base(DeclarativeBase):
     pass

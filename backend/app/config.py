@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "production"
     RELEASE: str = "dev"
     SENTRY_DSN: str = ""
+    LOG_LEVEL: str = "INFO"
+    
+    # Frontend / OAuth (used later)
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
+    FRONTEND_URL: str = "http://localhost:5173"
 
     @property
     def allowed_origins_list(self) -> list[str]:
