@@ -291,12 +291,20 @@ export const AnnotatePage: React.FC = () => {
         <p className="text-sm text-slate-500 mb-6">
           Upload images to start annotating.
         </p>
-        <Link
-          to={`/projects/${taskData?.project_id}`}
-          className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
-        >
-          Back to Project
-        </Link>
+        <div className="flex gap-4">
+          <Link
+            to={`/projects/${taskData?.project_id}`}
+            className="px-5 py-2 border border-slate-300 text-slate-700 text-sm rounded-md hover:bg-slate-50"
+          >
+            Back to Project
+          </Link>
+          <Link
+            to={`/tasks/${id}/setup`}
+            className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
+          >
+            Upload images
+          </Link>
+        </div>
       </div>
     );
   }

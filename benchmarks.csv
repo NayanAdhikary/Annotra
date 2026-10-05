@@ -1,0 +1,13 @@
+metric,before,after,delta
+B1_task_detail_seconds,,,
+B2_annotations_all_seconds,,,
+B2_annotations_all_bytes,,,
+B2b_annotations_per_image_seconds,,,
+B3_my_tasks_seconds,,,
+B4_projects_seconds,,,
+B5_review_queue_seconds,,,
+B4_browser_tti_seconds,,,
+B5_sidebar_fps,,,
+export_coco_seconds,,,
+query_plan_annotations,,,
+bundle_size_kb,,,

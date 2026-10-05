@@ -1,0 +1,11 @@
+--- SELECT * FROM annotations WHERE task_id = 9999 AND image_id = 1 ORDER BY frame, id LIMIT 500; ---
+(5, 0, 0, 'SEARCH annotations USING INDEX ix_annotations_image_id (image_id=?)')
+(42, 0, 0, 'USE TEMP B-TREE FOR ORDER BY')
+
+--- SELECT COUNT(*) FROM annotations WHERE task_id = 9999; ---
+(3, 0, 0, 'SEARCH annotations USING COVERING INDEX ix_annotations_task_id (task_id=?)')
+
+--- SELECT * FROM tasks WHERE project_id = (SELECT project_id FROM tasks WHERE id = 9999); ---
+(3, 0, 0, 'SEARCH tasks USING INDEX ix_tasks_project_id (project_id=?)')
+(6, 0, 0, 'SCALAR SUBQUERY 1')
+(10, 6, 0, 'SEARCH tasks USING INTEGER PRIMARY KEY (rowid=?)')
